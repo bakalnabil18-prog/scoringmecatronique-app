@@ -1,0 +1,10 @@
+Prototype de scoring multi-piliers pour l'assurance industrielle au Maroc.
+
+### ✨ Fonctionnalités
+
+- ✅ 3 piliers de scoring: Robustesse, Maintenance, Gouvernance
+- ✅ 6 secteurs marocains: Textile, Agroalimentaire, Mines, Chimie, Construction, Énergie
+- ✅ Devise marocaine (DH) + TVA 20%
+- ✅ Conformité ACPR & Code Assurances Maroc
+- ✅ 3 presets régionaux (Casablanca, Agadir, Khouribga)
+- ✅ Interface moderne avec Streamlit

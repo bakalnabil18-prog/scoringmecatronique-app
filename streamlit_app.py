@@ -207,7 +207,7 @@ with col_output:
             line=dict(color='#0066cc'),
             fillcolor='rgba(0, 102, 204, 0.25)'
         ))
-        fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor='rgba(88, 166, 255, 0.1)'), bgcolor='transparent'), font=dict(size=10, color='#9aa0a6'), paper_bgcolor='rgba(31, 47, 72, 0.3)', plot_bgcolor='transparent', height=350, showlegend=False)
+        fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor='rgba(88, 166, 255, 0.1)'), bgcolor='rgba(0,0,0,0)'), font=dict(size=10, color='#111827'), paper_bgcolor='rgba(255,255,255,1)', plot_bgcolor='rgba(0,0,0,0)', height=350, showlegend=False)
         st.plotly_chart(fig_radar, use_container_width=True, config={'displayModeBar': False})
         
     else:

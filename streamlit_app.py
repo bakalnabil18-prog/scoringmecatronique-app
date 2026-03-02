@@ -26,12 +26,10 @@ from engine.data_models import (
     EquipmentProfile, MaintenanceProfile, DataQualityMetrics,
     IoTFeatures, SensorSeriesSummary, UnderwritingInput
 )
-from engine.pipeline import run_underwriting
-from engine.reporting import save_underwriting_report
 
 
 # ============================================================
-# CONFIG & STYLING MAROCAIN
+# CONFIG & STYLING MAROCAIN — THÈME MÉCATRONIQUE
 # ============================================================
 st.set_page_config(
     page_title="Underwriting Maroc | Industrie 4.0",
@@ -40,90 +38,133 @@ st.set_page_config(
     menu_items={"About": "Système de Scoring Assurance Industrielle — Maroc 🇲🇦"}
 )
 
-# Design premium marocain (bleu royal + vert + or)
+# Design mécatronique — Bleu acier + Gris industriel + Orange
 st.markdown("""
 <style>
-    /* Couleurs marocaines */
+    /* Variables couleurs mécatronique */
     :root {
-        --primary: #003d5c;      /* Bleu royal marocain */
-        --secondary: #00a651;    /* Vert marocain */
-        --accent: #c69c6d;       /* Or marocain */
+        --primary-dark: #0a1f3e;        /* Bleu acier foncé */
+        --primary: #1a3a5c;             /* Bleu acier */
+        --secondary: #00a651;           /* Vert technologie */
+        --accent: #ff6b35;              /* Orange industrie */
+        --gray-light: #f0f2f5;          /* Gris clair */
+        --gray-dark: #2d3436;           /* Gris sombre */
         --success: #10b981;
         --danger: #ef4444;
         --warning: #f59e0b;
     }
     
-    /* Header marocain */
+    /* Background mécatronique */
+    body {
+        background: linear-gradient(135deg, #0a1f3e 0%, #1a3a5c 25%, #2d3436 50%, #1a3a5c 75%, #0a1f3e 100%);
+        background-attachment: fixed;
+        color: #2d3436;
+    }
+    
+    .stApp {
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%231a3a5c" width="100" height="100"/><circle cx="10" cy="10" r="2" fill="%23ff6b35" opacity="0.1"/><circle cx="50" cy="50" r="2" fill="%2300a651" opacity="0.05"/></svg>');
+    }
+    
+    /* Header mécatronique premium */
     .main-header {
-        background: linear-gradient(135deg, #003d5c 0%, #005a7f 50%, #00a651 100%);
+        background: linear-gradient(90deg, #0a1f3e 0%, #1a3a5c 50%, #2d3436 100%);
         color: white;
-        padding: 30px;
-        border-radius: 10px;
+        padding: 40px 30px;
+        border-radius: 15px;
         margin-bottom: 30px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-        border: 3px solid #c69c6d;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 
+                    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        border: 2px solid #ff6b35;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .main-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 200px;
+        height: 200px;
+        background: radial-gradient(circle, rgba(255, 107, 53, 0.1) 0%, transparent 70%);
+        border-radius: 50%;
     }
     
     .main-header h1 {
         margin: 0;
-        font-size: 2.2em;
-        font-weight: 700;
+        font-size: 2.5em;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
     }
     
-    .main-header .flag {
-        font-size: 2em;
-        margin-right: 10px;
+    .main-header p {
+        margin: 10px 0 0 0;
+        font-size: 1.1em;
+        opacity: 0.95;
+        font-weight: 300;
     }
     
-    /* Score cards */
+    /* Score cards mécatronique */
     .score-card {
         background: white;
         border-radius: 12px;
-        padding: 20px;
-        border-left: 6px solid #003d5c;
-        border-top: 3px solid #c69c6d;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        margin: 10px 0;
+        padding: 25px;
+        border-left: 6px solid #1a3a5c;
+        border-top: 3px solid #ff6b35;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1),
+                    0 2px 0 rgba(255, 107, 53, 0.5);
+        margin: 15px 0;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .score-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15),
+                    0 2px 0 rgba(255, 107, 53, 0.7);
     }
     
     .score-card.robustness {
         border-left-color: #0066cc;
-        border-top-color: #003d5c;
+        border-top-color: #ff6b35;
     }
     
     .score-card.maintenance {
         border-left-color: #00a651;
-        border-top-color: #006633;
+        border-top-color: #ff6b35;
     }
     
     .score-card.governance {
-        border-left-color: #c69c6d;
-        border-top-color: #8b6f47;
+        border-left-color: #ff6b35;
+        border-top-color: #0a1f3e;
     }
     
-    /* Risk level badge marocain */
-    .risk-badge-maroc {
+    /* Risk level badge */
+    .risk-badge {
         display: inline-block;
-        padding: 10px 20px;
+        padding: 12px 24px;
         border-radius: 8px;
         font-weight: bold;
         font-size: 1.1em;
-        border: 2px solid #003d5c;
+        border: 2px solid #1a3a5c;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
     
-    .risk-badge-maroc.faible {
+    .risk-badge.faible {
         background: #d1fae5;
         color: #00a651;
         border-color: #00a651;
     }
     
-    .risk-badge-maroc.moyen {
+    .risk-badge.moyen {
         background: #fef3c7;
         color: #92400e;
         border-color: #f59e0b;
     }
     
-    .risk-badge-maroc.élevé {
+    .risk-badge.élevé {
         background: #fee2e2;
         color: #8b0000;
         border-color: #ef4444;
@@ -131,40 +172,69 @@ st.markdown("""
     
     /* Driver items */
     .driver-item {
-        background: #f9fafb;
-        border-left: 4px solid #003d5c;
-        border-top: 2px solid #c69c6d;
-        padding: 12px;
-        margin: 8px 0;
+        background: linear-gradient(90deg, #f9fafb 0%, #f0f2f5 100%);
+        border-left: 4px solid #1a3a5c;
+        border-top: 2px solid #ff6b35;
+        padding: 14px;
+        margin: 10px 0;
         border-radius: 6px;
         font-size: 0.95em;
         line-height: 1.6;
     }
     
-    /* Form section */
+    /* Form section headers */
     .form-section-header {
         font-size: 1.3em;
         font-weight: 700;
-        color: #003d5c;
-        margin: 20px 0 15px 0;
+        color: #0a1f3e;
+        margin: 25px 0 15px 0;
         padding-bottom: 10px;
-        border-bottom: 3px solid #c69c6d;
+        border-bottom: 3px solid #ff6b35;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
     
-    /* Sector selector */
-    .sector-selector {
-        background: linear-gradient(90deg, #003d5c 0%, #00a651 100%);
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0a1f3e 0%, #1a3a5c 100%);
+    }
+    
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        border-bottom: 3px solid #ff6b35;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        border-bottom: 3px solid #ff6b35 !important;
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        background: linear-gradient(90deg, #1a3a5c 0%, #2d3436 100%);
         color: white;
-        padding: 15px;
+        border: 2px solid #ff6b35;
+        font-weight: 700;
+        padding: 12px 24px;
         border-radius: 8px;
-        margin: 10px 0;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(90deg, #ff6b35 0%, #ff8a5c 100%);
+        border-color: #0a1f3e;
+    }
+    
+    /* Metric cards */
+    [data-testid="stMetricValue"] {
+        color: #1a3a5c;
+        font-weight: 700;
     }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ============================================================
-# PRESETS MAROCAINS AVANCÉS
+# PRESETS MAROCAINS
 # ============================================================
 def get_preset_maroc(case):
     presets = {
@@ -178,7 +248,6 @@ def get_preset_maroc(case):
             "criticality": 4,
             "redundancy": True,
             "environment_severity": 2,
-            
             "automation_level": 4,
             "sensor_coverage": 4,
             "control_system_type": "advanced",
@@ -200,11 +269,9 @@ def get_preset_maroc(case):
             "incident_tracking_system": True,
             "anomaly_detection_formalized": True,
             "continuity_test_frequency_months": 6,
-            
             "vibration_health": 90,
             "temperature_health": 88,
             "electrical_health": 92,
-            
             "completeness": 0.99,
             "latency_seconds": 30.0,
             "calibration_age_days": 120,
@@ -222,7 +289,6 @@ def get_preset_maroc(case):
             "criticality": 5,
             "redundancy": False,
             "environment_severity": 3,
-            
             "automation_level": 2,
             "sensor_coverage": 3,
             "control_system_type": "modern",
@@ -244,11 +310,9 @@ def get_preset_maroc(case):
             "incident_tracking_system": True,
             "anomaly_detection_formalized": False,
             "continuity_test_frequency_months": 12,
-            
             "vibration_health": 55,
             "temperature_health": 60,
             "electrical_health": 58,
-            
             "completeness": 0.95,
             "latency_seconds": 60.0,
             "calibration_age_days": 300,
@@ -259,14 +323,13 @@ def get_preset_maroc(case):
         "⛏️ Mines Phosphates Khouribga — RISQUE ÉLEVÉ": {
             "secteur": "mines_phosphates",
             "equipment_id": "EXCAVATRICE-12",
-            "equipment_type": "Excavatrice lourde (45M DH)",
+            "equipment_type": "Excavatrice lourde",
             "replacement_value": 45000000.0,
             "age_years": 12.0,
             "mtbf_hours": 15000.0,
             "criticality": 5,
             "redundancy": False,
             "environment_severity": 5,
-            
             "automation_level": 1,
             "sensor_coverage": 1,
             "control_system_type": "legacy",
@@ -288,11 +351,9 @@ def get_preset_maroc(case):
             "incident_tracking_system": False,
             "anomaly_detection_formalized": False,
             "continuity_test_frequency_months": 999,
-            
             "vibration_health": 20,
             "temperature_health": 25,
             "electrical_health": 22,
-            
             "completeness": 0.80,
             "latency_seconds": 600.0,
             "calibration_age_days": 1200,
@@ -304,142 +365,88 @@ def get_preset_maroc(case):
 
 
 # ============================================================
-# HEADER MAROCAIN
+# HEADER MÉCATRONIQUE
 # ============================================================
 st.markdown("""
 <div class="main-header">
-    <div style="display: flex; align-items: center;">
-        <span class="flag">🇲🇦</span>
-        <div>
-            <h1>UNDERWRITING MAROC — Industrie 4.0</h1>
-            <p style="margin: 5px 0; font-size: 1.1em; opacity: 0.95;">
-                Système de Scoring pour Assurance Industrielle au Maroc
-            </p>
-        </div>
-    </div>
+    <h1>🏭 UNDERWRITING MAROC</h1>
+    <p>Système de Scoring Industrie 4.0 — Mécatronique Avancée</p>
 </div>
 """, unsafe_allow_html=True)
 
-# Devise affichée
-col1, col2, col3 = st.columns([2, 1, 1])
-with col2:
-    st.metric("💱 Devise", "Dirham (DH)")
-with col3:
-    st.metric("📍 Marché", "Maroc")
-
 
 # ============================================================
-# SIDEBAR MAROCAIN
+# SIDEBAR
 # ============================================================
-st.sidebar.markdown("## 🇲🇦 Configuration Maroc")
+st.sidebar.markdown("## ⚙️ Configuration")
 st.sidebar.markdown("---")
 
-# Secteur choix
+# Secteur
 secteur_labels = {
     "textile_confection": "🏭 Textile & Confection",
     "agroalimentaire": "🥕 Agroalimentaire",
     "mines_phosphates": "⛏️ Mines & Phosphates",
     "chimie_pharmacie": "⚗️ Chimie & Pharmacie",
-    "construction_materiaux": "🏗️ Construction & Matériaux",
+    "construction_materiaux": "🏗️ Construction",
     "energie_eau": "⚡ Énergie & Eau",
-    "autres": "📦 Autres secteurs",
+    "autres": "📦 Autres",
 }
 
 secteur_selected = st.sidebar.selectbox(
-    "🏢 Choisir secteur d'activité",
+    "Choisir secteur",
     list(secteur_labels.keys()),
     format_func=lambda x: secteur_labels[x]
 )
 
-# Info secteur
 if secteur_selected != "autres":
     secteur_info = SECTEURS_MAROC[secteur_selected]
     st.sidebar.markdown(f"""
     **{secteur_info['nom']}**
     - Taux base: {secteur_info['taux_base_pct']}%
-    - Régions: {", ".join(secteur_info['regions'])}
+    - Régions: {", ".join(secteur_info['regions'][:2])}
     """)
 
 st.sidebar.markdown("---")
 
-# Presets marocains
+# Presets
 preset_options = {
     "Manuel": None,
-    "🏭 Textile Casablanca — FAIBLE RISQUE": "🏭 Textile Casablanca — FAIBLE RISQUE",
-    "🥕 Agroalimentaire Agadir — RISQUE MOYEN": "🥕 Agroalimentaire Agadir — RISQUE MOYEN",
-    "⛏️ Mines Phosphates Khouribga — RISQUE ÉLEVÉ": "⛏️ Mines Phosphates Khouribga — RISQUE ÉLEVÉ",
+    "🏭 Textile Casablanca": "🏭 Textile Casablanca — FAIBLE RISQUE",
+    "🥕 Agroalimentaire Agadir": "🥕 Agroalimentaire Agadir — RISQUE MOYEN",
+    "⛏️ Mines Khouribga": "⛏️ Mines Phosphates Khouribga — RISQUE ÉLEVÉ",
 }
 
-case_selected = st.sidebar.selectbox(
-    "⚡ Scénarios rapides (presets)",
-    list(preset_options.keys())
-)
-
+case_selected = st.sidebar.selectbox("Preset", list(preset_options.keys()))
 preset_data = get_preset_maroc(preset_options[case_selected]) if preset_options[case_selected] else {}
-
-st.sidebar.markdown("---")
-
-st.sidebar.markdown("""
-### 📖 Guide Utilisation
-1. **Choisissez un secteur** (textile, agroalim, mines, etc.)
-2. **Optionnel**: Charger un preset rapide
-3. **Remplissez les données** d'équipement et maintenance
-4. **Cliquez « ANALYSER »**
-5. **Consultez les onglets** pour résultats détaillés
-
-### 🇲🇦 Spécificités Maroc
-- **Devise**: Dirham marocain (DH)
-- **Réglementations**: Code assurances Maroc + ACPR
-- **Secteurs locaux**: Textile, agroalim, mines, chimie
-- **Normes**: ISO + certifications marocaines
-- **Risques spécifiques**: Climat, approvisionnement, change
-""")
 
 
 # ============================================================
 # ONGLETS
 # ============================================================
-tab1, tab2, tab3, tab4 = st.tabs([
-    "📝 Saisie Équipement", 
-    "📊 Scoring 3-Piliers", 
-    "🎯 Décision & Recommandations", 
-    "💰 Analyse Financière"
-])
+tab1, tab2, tab3, tab4 = st.tabs(["📝 Saisie Équipement", "📊 Scoring 3-Piliers", "🎯 Décision", "💰 Finance"])
 
 
 # ============================================================
-# TAB 1 — SAISIE ÉQUIPEMENT MAROCAIN
+# TAB 1 — SAISIE ÉQUIPEMENT
 # ============================================================
 with tab1:
     st.header("Formulaire Saisie Équipement")
-    st.caption(f"Secteur choisi: {secteur_labels[secteur_selected]}")
+    st.caption(f"Secteur: {secteur_labels[secteur_selected]}")
     
-    # --- Secteur info box ---
     if secteur_selected != "autres":
         secteur_data = SECTEURS_MAROC[secteur_selected]
-        st.info(f"""
-        **{secteur_data['nom']}** 
-        - Importance: {secteur_data['importance']}
-        - Principales régions: {", ".join(secteur_data['regions'])}
-        - Risques spécifiques: {", ".join(secteur_data['risques_specifiques'][:2])}
-        """)
+        st.info(f"**{secteur_data['nom']}** — {secteur_data['importance']}")
     
-    # --- Equipment ---
-    st.markdown('<div class="form-section-header">⚙️ ÉQUIPEMENT & INFRASTRUCTURE</div>', unsafe_allow_html=True)
+    # Equipment
+    st.markdown('<div class="form-section-header">⚙️ Équipement & Infrastructure</div>', unsafe_allow_html=True)
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         equipment_id = st.text_input("ID Équipement", value=preset_data.get("equipment_id", "EQ-01"))
     with col2:
-        equipment_type = st.text_input("Type d'équipement", value=preset_data.get("equipment_type", "Machine"))
+        equipment_type = st.text_input("Type", value=preset_data.get("equipment_type", "Machine"))
     with col3:
-        replacement_value = st.number_input(
-            "Valeur de remplacement (DH)", 
-            min_value=10000.0, 
-            value=float(preset_data.get("replacement_value", 500000.0)), 
-            step=50000.0,
-            format="%.0f"
-        )
+        replacement_value = st.number_input("Valeur d'équipement", min_value=10000.0, value=float(preset_data.get("replacement_value", 500000.0)), step=50000.0, format="%.0f")
     with col4:
         age_years = st.number_input("Âge (années)", min_value=0.0, value=float(preset_data.get("age_years", 5.0)), step=1.0)
     
@@ -449,87 +456,53 @@ with tab1:
     with col2:
         criticality = st.slider("Criticité (1-5)", 1, 5, int(preset_data.get("criticality", 3)))
     with col3:
-        redundancy = st.checkbox("Redondance présente", value=bool(preset_data.get("redundancy", False)))
+        redundancy = st.checkbox("Redondance", value=bool(preset_data.get("redundancy", False)))
     with col4:
-        environment_severity = st.slider("Sévérité environnement (1-5)", 1, 5, int(preset_data.get("environment_severity", 3)))
+        environment_severity = st.slider("Sévérité env. (1-5)", 1, 5, int(preset_data.get("environment_severity", 3)))
     
-    # --- Technology ---
-    st.markdown('<div class="form-section-header">🔧 TECHNOLOGIE & AUTOMATISATION</div>', unsafe_allow_html=True)
+    # Technology
+    st.markdown('<div class="form-section-header">🔧 Technologie & Automatisation</div>', unsafe_allow_html=True)
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        automation_level = st.selectbox(
-            "Niveau automatisation", 
-            ["Manuel (1)", "Semi-auto (2)", "Automatisé (3)", "IoT avancé (4)"],
-            index=int(preset_data.get("automation_level", 1)) - 1
-        )
+        automation_level = st.selectbox("Automatisation", ["Manuel (1)", "Semi-auto (2)", "Automatisé (3)", "IoT (4)"], index=int(preset_data.get("automation_level", 1)) - 1)
         automation_level = int(automation_level.split("(")[1].strip(")"))
     with col2:
-        sensor_coverage = st.selectbox(
-            "Couverture capteurs",
-            ["Aucun (1)", "Basique (2)", "Avancée (3)", "Complète (4)"],
-            index=int(preset_data.get("sensor_coverage", 1)) - 1
-        )
+        sensor_coverage = st.selectbox("Capteurs", ["Aucun (1)", "Basique (2)", "Avancée (3)", "Complète (4)"], index=int(preset_data.get("sensor_coverage", 1)) - 1)
         sensor_coverage = int(sensor_coverage.split("(")[1].strip(")"))
     with col3:
-        control_system_type = st.selectbox(
-            "Système de contrôle", 
-            ["Legacy (ancien)", "Modern (moderne)", "Advanced (avancé)"],
-            index={"legacy": 0, "modern": 1, "advanced": 2}.get(preset_data.get("control_system_type", "legacy"), 0)
-        )
-        control_system_type = control_system_type.split("(")[0].strip().lower()
+        control_system_type = st.selectbox("Système de contrôle", ["Legacy", "Modern", "Advanced"], index={"legacy": 0, "modern": 1, "advanced": 2}.get(preset_data.get("control_system_type", "legacy"), 0))
+        control_system_type = control_system_type.lower()
     with col4:
         vibration_health = st.slider("Santé vibration (0-100)", 0, 100, int(preset_data.get("vibration_health", 50)))
     
-    # --- Maintenance ---
-    st.markdown('<div class="form-section-header">🔧 MAINTENANCE & EXPLOITATION</div>', unsafe_allow_html=True)
+    # Maintenance
+    st.markdown('<div class="form-section-header">🔧 Maintenance & Exploitation</div>', unsafe_allow_html=True)
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        maintenance_strategy = st.selectbox(
-            "Stratégie maintenance", 
-            ["Corrective", "Preventive", "Predictive"],
-            index={"corrective": 0, "preventive": 1, "predictive": 2}.get(preset_data.get("maintenance_strategy", "preventive"), 0)
-        )
+        maintenance_strategy = st.selectbox("Stratégie", ["Corrective", "Preventive", "Predictive"], index={"corrective": 0, "preventive": 1, "predictive": 2}.get(preset_data.get("maintenance_strategy", "preventive"), 0))
     with col2:
         gmao_operational = st.checkbox("GMAO opérationnelle", value=bool(preset_data.get("gmao_operational", False)))
     with col3:
-        preventive_compliance = st.slider("Conformité préventif (0-1)", 0.0, 1.0, float(preset_data.get("preventive_compliance", 0.85)), 0.01)
+        preventive_compliance = st.slider("Conformité prév. (0-1)", 0.0, 1.0, float(preset_data.get("preventive_compliance", 0.85)), 0.01)
     with col4:
-        mean_response_days = st.number_input("Temps réponse moy (jours)", min_value=0.0, value=float(preset_data.get("mean_response_days", 7.0)), step=1.0)
+        mean_response_days = st.number_input("Temps réponse (jours)", min_value=0.0, value=float(preset_data.get("mean_response_days", 7.0)), step=1.0)
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        team_structure = st.selectbox(
-            "Structure équipe", 
-            ["Informelle (1)", "Basique (2)", "Structurée (3)", "Certifiée (4)"],
-            index=int(preset_data.get("team_structure", 2)) - 1
-        )
+        team_structure = st.selectbox("Équipe", ["Informelle (1)", "Basique (2)", "Structurée (3)", "Certifiée (4)"], index=int(preset_data.get("team_structure", 2)) - 1)
         team_structure = int(team_structure.split("(")[1].strip(")"))
     with col2:
-        technician_training_level = st.slider("Formation techniciens (1-5)", 1, 5, int(preset_data.get("technician_training_level", 3)))
+        technician_training_level = st.slider("Formation tech. (1-5)", 1, 5, int(preset_data.get("technician_training_level", 3)))
     with col3:
-        spare_parts_availability = st.selectbox(
-            "Disponibilité pièces",
-            ["Faible (1)", "Basique (2)", "Bonne (3)", "Excellente (4)"],
-            index=int(preset_data.get("spare_parts_availability", 2)) - 1
-        )
+        spare_parts_availability = st.selectbox("Pièces détachées", ["Faible (1)", "Basique (2)", "Bonne (3)", "Excellente (4)"], index=int(preset_data.get("spare_parts_availability", 2)) - 1)
         spare_parts_availability = int(spare_parts_availability.split("(")[1].strip(")"))
     with col4:
-        preventive_frequency_days = st.number_input("Fréquence prév (jours)", min_value=1, value=int(preset_data.get("preventive_frequency_days", 90)), step=10)
+        preventive_frequency_days = st.number_input("Fréquence prév. (jours)", min_value=1, value=int(preset_data.get("preventive_frequency_days", 90)), step=10)
     
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        last_major_overhaul_days = st.number_input("Dernier overhaul (jours)", min_value=0, value=int(preset_data.get("last_major_overhaul_days", 300)), step=10)
-    with col2:
-        maintenance_backlog_ratio = st.slider("Arriéré maintenance (0-1)", 0.0, 1.0, float(preset_data.get("maintenance_backlog_ratio", 0.1)), 0.01)
-    with col3:
-        manufacturer_contract = st.checkbox("Contrat constructeur", value=bool(preset_data.get("manufacturer_contract", False)))
-    with col4:
-        pass
-    
-    # --- Governance ---
-    st.markdown('<div class="form-section-header">📋 GOUVERNANCE & CONFORMITÉ</div>', unsafe_allow_html=True)
+    # Governance
+    st.markdown('<div class="form-section-header">📋 Gouvernance & Conformité</div>', unsafe_allow_html=True)
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -537,19 +510,15 @@ with tab1:
     with col2:
         pca_exists = st.checkbox("PCA en place", value=bool(preset_data.get("pca_exists", False)))
     with col3:
-        pca_tested = st.checkbox("PCA testé régul.", value=bool(preset_data.get("pca_tested", False)))
+        pca_tested = st.checkbox("PCA testé", value=bool(preset_data.get("pca_tested", False)))
     with col4:
-        audit_frequency_months = st.number_input("Fréquence audit (mois)", min_value=1, value=int(preset_data.get("audit_frequency_months", 12)), step=6)
+        audit_frequency_months = st.number_input("Audit (mois)", min_value=1, value=int(preset_data.get("audit_frequency_months", 12)), step=6)
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        operator_training_level = st.slider("Formation opérateurs (1-5)", 1, 5, int(preset_data.get("operator_training_level", 3)))
+        operator_training_level = st.slider("Formation opér. (1-5)", 1, 5, int(preset_data.get("operator_training_level", 3)))
     with col2:
-        documentation_quality = st.selectbox(
-            "Qualité documentation",
-            ["Faible (1)", "Basique (2)", "Bonne (3)", "Excellente (4)"],
-            index=int(preset_data.get("documentation_quality", 2)) - 1
-        )
+        documentation_quality = st.selectbox("Documentation", ["Faible (1)", "Basique (2)", "Bonne (3)", "Excellente (4)"], index=int(preset_data.get("documentation_quality", 2)) - 1)
         documentation_quality = int(documentation_quality.split("(")[1].strip(")"))
     with col3:
         incident_tracking_system = st.checkbox("Tracking incidents", value=bool(preset_data.get("incident_tracking_system", False)))
@@ -558,32 +527,17 @@ with tab1:
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        continuity_test_frequency_months = st.number_input("Test continuité (mois)", min_value=1, value=int(preset_data.get("continuity_test_frequency_months", 12)), step=6)
+        maintenance_backlog_ratio = st.slider("Arriéré maint. (0-1)", 0.0, 1.0, float(preset_data.get("maintenance_backlog_ratio", 0.1)), 0.01)
     with col2:
-        iso_count = st.number_input("Nombre certifications ISO", min_value=0, max_value=5, value=len(preset_data.get("iso_certifications", [])))
+        temperature_health = st.slider("Santé temp. (0-100)", 0, 100, int(preset_data.get("temperature_health", 50)))
     with col3:
-        completeness = st.slider("Complétude données (0-1)", 0.0, 1.0, float(preset_data.get("completeness", 0.95)), 0.01)
+        electrical_health = st.slider("Santé électrique (0-100)", 0, 100, int(preset_data.get("electrical_health", 50)))
     
-    # --- IoT sensors (simplified) ---
-    st.markdown('<div class="form-section-header">📡 CAPTEURS IoT (SANTÉ)</div>', unsafe_allow_html=True)
-    st.caption("Les valeurs de santé influencent le score de robustesse")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        latency_seconds = st.number_input("Latence données (sec)", min_value=1, value=int(preset_data.get("latency_seconds", 60)), step=10)
-    with col2:
-        calibration_age_days = st.number_input("Âge calibration (jours)", min_value=0, value=int(preset_data.get("calibration_age_days", 180)), step=30)
-    with col3:
-        drift_flag = st.checkbox("Drift détecté", value=bool(preset_data.get("drift_flag", False)))
-    
-    # Button to analyse
-    st.markdown("---")
-    
+    # Button
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("🚀 LANCER SCORING AVANCÉ", key="analyze_btn", use_container_width=True):
+        if st.button("🚀 LANCER ANALYSE", key="analyze_btn", use_container_width=True):
             try:
-                # Build objects
                 equipment = EquipmentProfile(
                     equipment_id=equipment_id,
                     equipment_type=equipment_type,
@@ -595,7 +549,6 @@ with tab1:
                     environment_severity=int(environment_severity),
                 )
                 
-                # Advanced scoring
                 robustness = score_robustness(
                     equipment_age_years=float(age_years),
                     automation_level=automation_level,
@@ -603,8 +556,8 @@ with tab1:
                     redundancy=float(redundancy),
                     control_system_type=control_system_type,
                     vibration_health=float(vibration_health),
-                    temperature_health=float(preset_data.get("temperature_health", 50)),
-                    electrical_health=float(preset_data.get("electrical_health", 50)),
+                    temperature_health=float(temperature_health),
+                    electrical_health=float(electrical_health),
                 )
                 
                 maintenance = score_maintenance_maturity(
@@ -612,7 +565,7 @@ with tab1:
                     gmao_operational=gmao_operational,
                     pm_compliance=preventive_compliance,
                     team_structure=team_structure,
-                    manufacturer_contract=manufacturer_contract,
+                    manufacturer_contract=preset_data.get("manufacturer_contract", False),
                     preventive_frequency_days=int(preventive_frequency_days),
                     maintenance_backlog_ratio=float(maintenance_backlog_ratio),
                     technician_training_level=technician_training_level,
@@ -624,18 +577,16 @@ with tab1:
                     pca_exists=pca_exists,
                     pca_tested=pca_tested,
                     audit_frequency_months=int(audit_frequency_months),
-                    iso_certifications=["ISO" + str(i) for i in range(iso_count)],
+                    iso_certifications=["ISO"] * 0,
                     operator_training_level=operator_training_level,
                     documentation_quality=documentation_quality,
                     incident_tracking_system=incident_tracking_system,
                     anomaly_detection_formalized=anomaly_detection_formalized,
-                    continuity_test_frequency_months=int(continuity_test_frequency_months),
+                    continuity_test_frequency_months=preset_data.get("continuity_test_frequency_months", 12),
                 )
                 
-                # Advanced result
                 advanced_result = compute_advanced_scoring(robustness, maintenance, governance)
                 
-                # Store in session
                 st.session_state.robustness = robustness
                 st.session_state.maintenance = maintenance
                 st.session_state.governance = governance
@@ -643,118 +594,96 @@ with tab1:
                 st.session_state.equipment = equipment
                 st.session_state.secteur_selected = secteur_selected
                 
-                st.success("✅ Scoring avancé terminé! Consultez les onglets résultats.")
+                st.success("✅ Analyse complétée! Consultez les autres onglets.")
             
             except Exception as e:
                 st.error(f"❌ Erreur: {str(e)}")
 
 
 # ============================================================
-# TAB 2 — SCORING 3-PILIERS MAROCAIN
+# TAB 2 — SCORING 3-PILIERS
 # ============================================================
 with tab2:
-    st.header("📊 Scoring Avancé — 3 Piliers")
+    st.header("Scoring Avancé — 3 Piliers")
     
     if hasattr(st.session_state, 'advanced_result'):
         result = st.session_state.advanced_result
         
-        # --- Affichage global ---
         col1, col2, col3 = st.columns(3)
         
         with col1:
             risk_color = "faible" if result.risk_level == "FAIBLE" else ("moyen" if result.risk_level == "MOYEN" else "élevé")
             st.markdown(f"""
             <div class="score-card" style="text-align: center;">
-                <h3>Score Global de Risque</h3>
-                <div style="font-size: 3em; font-weight: 700; color: #003d5c; margin: 15px 0;">{result.global_score:.1f} / 100</div>
-                <div class="risk-badge-maroc {risk_color}">
-                    {result.risk_level}
-                </div>
-                <p style="color: #666; font-size: 0.9em; margin-top: 10px;">
-                    Pondération: Robustesse 35% | Maintenance 45% | Gouvernance 20%
-                </p>
+                <h3>Score Global</h3>
+                <div style="font-size: 3em; font-weight: 700; color: #1a3a5c; margin: 15px 0;">{result.global_score:.1f}/100</div>
+                <div class="risk-badge {risk_color}">{result.risk_level}</div>
             </div>
             """, unsafe_allow_html=True)
         
         with col2:
-            rob_color = "good" if result.robustness.score >= 75 else ("warning" if result.robustness.score >= 50 else "danger")
             st.markdown(f"""
             <div class="score-card robustness">
-                <h4>🔧 Robustesse Mécatronique (35%)</h4>
+                <h4>🔧 Robustesse (35%)</h4>
                 <div style="font-size: 2.5em; font-weight: 700; color: #0066cc; margin: 10px 0;">{result.robustness.score:.0f}</div>
-                <p style="color: #666; font-size: 0.85em;">État technique & instrumentation</p>
             </div>
             """, unsafe_allow_html=True)
-            
             for driver in result.robustness.drivers[:3]:
                 st.markdown(f'<div class="driver-item">{driver}</div>', unsafe_allow_html=True)
         
         with col3:
-            maint_color = "good" if result.maintenance.score >= 75 else ("warning" if result.maintenance.score >= 50 else "danger")
             st.markdown(f"""
             <div class="score-card maintenance">
-                <h4>🎯 Maturité Maintenance (45%)</h4>
+                <h4>🎯 Maintenance (45%)</h4>
                 <div style="font-size: 2.5em; font-weight: 700; color: #00a651; margin: 10px 0;">{result.maintenance.score:.0f}</div>
-                <p style="color: #666; font-size: 0.85em;">Procédures & discipline</p>
             </div>
             """, unsafe_allow_html=True)
-            
             for driver in result.maintenance.drivers[:3]:
                 st.markdown(f'<div class="driver-item">{driver}</div>', unsafe_allow_html=True)
         
         st.markdown("---")
         
-        # --- Gouvernance ---
         col1, col2 = st.columns(2)
         
         with col1:
-            gov_color = "good" if result.governance.score >= 75 else ("warning" if result.governance.score >= 50 else "danger")
             st.markdown(f"""
             <div class="score-card governance">
-                <h4>📋 Gouvernance Technique (20%)</h4>
-                <div style="font-size: 2.5em; font-weight: 700; color: #c69c6d; margin: 10px 0;">{result.governance.score:.0f}</div>
-                <p style="color: #666; font-size: 0.85em;">Organisation & encadrement</p>
+                <h4>📋 Gouvernance (20%)</h4>
+                <div style="font-size: 2.5em; font-weight: 700; color: #ff6b35; margin: 10px 0;">{result.governance.score:.0f}</div>
             </div>
             """, unsafe_allow_html=True)
-            
             for driver in result.governance.drivers[:3]:
                 st.markdown(f'<div class="driver-item">{driver}</div>', unsafe_allow_html=True)
         
         with col2:
-            # Radar chart
             fig_radar = go.Figure(data=go.Scatterpolar(
                 r=[result.robustness.score, result.maintenance.score, result.governance.score],
                 theta=['Robustesse', 'Maintenance', 'Gouvernance'],
                 fill='toself',
-                name='Score',
-                line_color='#003d5c'
+                line_color='#ff6b35'
             ))
-            
             fig_radar.update_layout(
-                polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor='#ddd')),
                 showlegend=False,
                 height=400,
-                title="Profil de Risque"
+                title="Profil de Risque",
+                template="plotly_white"
             )
-            
             st.plotly_chart(fig_radar, use_container_width=True)
-    
     else:
-        st.info("👈 Remplissez le formulaire et cliquez 'LANCER SCORING'")
+        st.info("👈 Complétez d'abord le formulaire")
 
 
 # ============================================================
-# TAB 3 — DÉCISION & RECOMMANDATIONS MAROCAINES
+# TAB 3 — DÉCISION
 # ============================================================
 with tab3:
-    st.header("🎯 Décision & Recommandations")
+    st.header("Décision & Recommandations")
     
     if hasattr(st.session_state, 'advanced_result'):
         result = st.session_state.advanced_result
         equipment = st.session_state.equipment
-        secteur = st.session_state.secteur_selected
         
-        # Classe de risque marocaine
         if result.global_score >= 75:
             classe = CLASSES_RISQUE_MAROC["classe_1"]
         elif result.global_score >= 50:
@@ -765,127 +694,90 @@ with tab3:
             classe = CLASSES_RISQUE_MAROC["classe_4"]
         
         st.markdown(f"""
-        ### Classification Marocaine
-        **Classe: {classe['nom']}** | Score: {result.global_score:.0f}
-        - Franchise recommandée: {classe['franchise_dh']} DH
+        ### Classification
+        **{classe['nom']}** | Score: {result.global_score:.0f}
+        - Franchise recommandée: {classe['franchise_dh']}
         - Taux prime: {classe['taux_prime']}
         """)
         
-        # Recommandations
-        st.markdown("### 💡 Recommandations de Souscription")
-        
+        st.markdown("### 💡 Recommandations")
         for i, rec in enumerate(result.recommendations, 1):
-            st.markdown(f'<div style="background: #eff6ff; border-left: 4px solid #003d5c; padding: 12px; border-radius: 6px; margin: 8px 0;">{i}. {rec}</div>', unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # Priorités de prévention
-        st.markdown("### 🔴 Priorités de Prévention")
-        
-        for priority in result.prevention_priorities:
-            st.markdown(f'<div class="driver-item">{priority}</div>', unsafe_allow_html=True)
-    
+            st.markdown(f'<div style="background: #f0f2f5; border-left: 4px solid #ff6b35; padding: 12px; margin: 8px 0; border-radius: 6px;">{i}. {rec}</div>', unsafe_allow_html=True)
     else:
-        st.info("👈 Complétez d'abord le scoring")
+        st.info("👈 Complétez d'abord le formulaire")
 
 
 # ============================================================
-# TAB 4 — ANALYSE FINANCIÈRE MAROCAINE
+# TAB 4 — ANALYSE FINANCIÈRE
 # ============================================================
 with tab4:
-    st.header("💰 Analyse Financière — Maroc")
+    st.header("Analyse Financière")
     
     if hasattr(st.session_state, 'advanced_result'):
         result = st.session_state.advanced_result
         equipment = st.session_state.equipment
         secteur = st.session_state.secteur_selected
         
-        # Classe & taux
         if result.global_score >= 75:
-            classe = CLASSES_RISQUE_MAROC["classe_1"]
             taux_min, taux_max = 0.4, 0.6
         elif result.global_score >= 50:
-            classe = CLASSES_RISQUE_MAROC["classe_2"]
             taux_min, taux_max = 0.7, 1.2
         elif result.global_score >= 25:
-            classe = CLASSES_RISQUE_MAROC["classe_3"]
             taux_min, taux_max = 1.3, 2.0
         else:
-            classe = CLASSES_RISQUE_MAROC["classe_4"]
             taux_min, taux_max = 2.0, 4.0
         
-        # Calculs
         taux_moyen = (taux_min + taux_max) / 2
-        prime_base_dh = equipment.replacement_value * (taux_moyen / 100)
-        
-        # Majorations/réductions secteur
         secteur_data = SECTEURS_MAROC.get(secteur, {})
         taux_secteur = secteur_data.get("taux_base_pct", 1.0)
-        prime_ajustee = equipment.replacement_value * (taux_secteur / 100)
         
-        # TVA
-        tva_dh = prime_ajustee * MAROC_CONFIG["tva_standard"]
-        total_ttc = prime_ajustee + tva_dh
-        
-        # Affichage
-        st.markdown(f"""
-        ### 📊 Estimation de Prime — Maroc (DH)
-        """)
+        prime_ht = equipment.replacement_value * (taux_secteur / 100)
+        tva = prime_ht * 0.20
+        total_ttc = prime_ht + tva
         
         col1, col2, col3, col4 = st.columns(4)
-        
         with col1:
-            st.metric("Valeur Assurée", f"{equipment.replacement_value:,.0f} DH")
+            st.metric("Valeur", f"{equipment.replacement_value:,.0f}")
         with col2:
-            st.metric("Taux Prime", f"{taux_secteur:.2f}%")
+            st.metric("Taux", f"{taux_secteur:.2f}%")
         with col3:
-            st.metric("Prime HT", f"{prime_ajustee:,.0f} DH")
+            st.metric("Prime HT", f"{prime_ht:,.0f}")
         with col4:
-            st.metric("Prime TTC", f"{total_ttc:,.0f} DH")
+            st.metric("Prime TTC", f"{total_ttc:,.0f}")
         
-        # Détail
         st.markdown("---")
         
         col1, col2 = st.columns(2)
-        
         with col1:
             st.markdown(f"""
             ### Détail Calcul
-            - **Valeur assurée**: {equipment.replacement_value:,.0f} DH
-            - **Taux base secteur**: {taux_secteur}%
-            - **Prime HT**: {prime_ajustee:,.0f} DH
-            - **TVA 20%**: {tva_dh:,.0f} DH
-            - **Total TTC**: {total_ttc:,.0f} DH
-            
-            ### Classe de Risque
-            - **Classe**: {classe['nom']}
-            - **Score Global**: {result.global_score:.1f}/100
-            - **Franchise recommandée**: {classe['franchise_dh']} DH
+            - Valeur: {equipment.replacement_value:,.0f}
+            - Taux: {taux_secteur}%
+            - Prime HT: {prime_ht:,.0f}
+            - TVA 20%: {tva:,.0f}
+            - **Total: {total_ttc:,.0f}**
             """)
         
         with col2:
-            # Pie chart
             fig_pie = px.pie(
-                names=['Prime HT', 'TVA 20%'],
-                values=[prime_ajustee, tva_dh],
-                title="Composition Prime (DH)",
-                color_discrete_sequence=['#003d5c', '#c69c6d']
+                names=['Prime HT', 'TVA'],
+                values=[prime_ht, tva],
+                title="Composition",
+                color_discrete_sequence=['#1a3a5c', '#ff6b35']
             )
-            
             st.plotly_chart(fig_pie, use_container_width=True)
-    
     else:
-        st.info("👈 Complétez d'abord le scoring")
+        st.info("👈 Complétez d'abord le formulaire")
 
 
 # ============================================================
-# FOOTER MAROCAIN
+# FOOTER
 # ============================================================
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; font-size: 0.9em; padding: 20px;">
-    <p>🇲🇦 <strong>Underwriting Maroc</strong> | Système de Scoring Industrie 4.0</p>
-    <p>Conforme: Code Assurances Maroc | ACPR | Normes ISO</p>
-    <p>© 2026 — Version 1.0 | Prototype Confidential</p>
+    <p>🇲🇦 <strong>Underwriting Maroc</strong> | Industrie 4.0 | Scoring Mécatronique</p>
+    <p>Code Assurances Maroc | ACPR | Normes ISO</p>
+    <p>© 2026 — Version 2.0</p>
 </div>
 """, unsafe_allow_html=True)

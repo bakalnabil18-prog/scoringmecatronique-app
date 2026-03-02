@@ -1,0 +1,27 @@
+RAPPORT DE SOUSCRIPTION – Panne Équipement + IoT + Maintenance Prédictive
+==============================================================================
+Équipement        : PUMP-07 (Pump)
+Date analyse      : 2026-03-01T01:12:33.331731Z
+
+1) DÉCISION
+- Décision        : ACCEPT_WITH_CONDITIONS
+- Tier de risque   : C
+- Franchise temps  : 120 h
+
+2) PARAMÈTRES RECOMMANDÉS
+- Limite DM        : 120,000
+- Limite PE (BI)   : 7,890
+- Prime base       : 2,076.36
+- Prime ajustée    : 2,076.36
+
+3) CLAUSES / CONDITIONS
+- Reporting mensuel Health Score + alertes critiques.
+- Mettre en place détection de drift.
+- Recalibrer capteurs sous 30 jours.
+- Accès read-only aux logs IoT + journal des interventions maintenance.
+
+4) DRIVERS TECHNIQUES
+- Health Score=50 (YELLOW)
+- P(fail 30d)=0.03%, RUL≈689 jours, hazard=LOW
+- DQ Score=74/100
+- Weibull ajusté: eta≈800j, beta≈2.44, proxy=0.47.

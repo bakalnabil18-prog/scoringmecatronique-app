@@ -1,0 +1,33 @@
+{
+  "equipment": {
+    "equipment_id": "PUMP-07",
+    "equipment_type": "Pump",
+    "replacement_value": 120000,
+    "age_years": 10,
+    "mtbf_hours": 20000,
+    "criticality": 4,
+    "redundancy": false,
+    "environment_severity": 3
+  },
+  "maintenance": {
+    "gmao_present": true,
+    "preventive_compliance": 0.78,
+    "mean_response_days": 12,
+    "spare_parts_ready": false,
+    "last_major_overhaul_days": 700
+  },
+  "data_quality": {
+    "completeness": 0.95,
+    "latency_seconds": 300,
+    "calibration_age_days": 420,
+    "drift_flag": true,
+    "outlier_rate": 0.03
+  },
+  "features": {
+    "vibration": { "mean": 2.5, "std": 0.35, "min": 1.8, "max": 3.9, "slope_per_day": 0.18, "last": 3.0 },
+    "temperature": { "mean": 50, "std": 5, "min": 40, "max": 75, "slope_per_day": 0.20, "last": 62 },
+    "electrical_current": { "mean": 95, "std": 10, "min": 80, "max": 135, "slope_per_day": 0.14, "last": 112 },
+    "power_factor_last": 0.92,
+    "thd_last": 8
+  }
+}

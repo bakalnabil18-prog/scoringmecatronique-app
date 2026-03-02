@@ -1,0 +1,83 @@
+{
+  "meta": {
+    "generated_at": "2026-03-01T02:32:49.399785Z",
+    "equipment_id": "EQ-01",
+    "equipment_type": "Machine",
+    "as_of": "2026-03-01T02:32:49.399785Z"
+  },
+  "input": {
+    "equipment": {
+      "equipment_id": "EQ-01",
+      "equipment_type": "Machine",
+      "replacement_value": 200000.0,
+      "age_years": 5.0,
+      "mtbf_hours": 40000.0,
+      "criticality": 3,
+      "redundancy": false,
+      "environment_severity": 3
+    },
+    "maintenance": {
+      "gmao_present": true,
+      "preventive_compliance": 0.85,
+      "mean_response_days": 7.0,
+      "spare_parts_ready": true,
+      "last_major_overhaul_days": 300
+    },
+    "data_quality": {
+      "completeness": 0.95,
+      "latency_seconds": 60.0,
+      "calibration_age_days": 200,
+      "drift_flag": false,
+      "outlier_rate": 0.02
+    },
+    "features": {
+      "vibration": {
+        "mean": 2.5,
+        "std": 0.3,
+        "min": 0.0,
+        "max": 2.8,
+        "slope_per_day": 0.1,
+        "last": 2.8
+      },
+      "temperature": {
+        "mean": 45.0,
+        "std": 4.0,
+        "min": 0.0,
+        "max": 55.0,
+        "slope_per_day": 0.2,
+        "last": 55.0
+      },
+      "electrical_current": {
+        "mean": 200.0,
+        "std": 15.0,
+        "min": 0.0,
+        "max": 230.0,
+        "slope_per_day": 0.1,
+        "last": 230.0
+      },
+      "power_factor_last": 0.95,
+      "thd_last": 5.0
+    },
+    "as_of": "2026-03-01T02:32:49.399785Z"
+  },
+  "decision": {
+    "decision": "ACCEPT_WITH_CONDITIONS",
+    "risk_tier": "C",
+    "recommended_deductible_hours": 120,
+    "recommended_limit_dm": 200000.0,
+    "recommended_limit_bi": 13150.0,
+    "base_premium": 3400.0000000000005,
+    "adjusted_premium": 3910.0,
+    "clauses": [
+      "Reporting mensuel Health Score + alertes critiques.",
+      "Recalibrer capteurs sous 30 jours.",
+      "Accès read-only aux logs IoT + journal des interventions maintenance."
+    ],
+    "drivers": [
+      "Health Score=64 (YELLOW)",
+      "P(fail 30d)=0.06%, RUL≈824 jours",
+      "Health band=YELLOW",
+      "hazard=LOW"
+    ]
+  }
+}

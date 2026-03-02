@@ -1,0 +1,82 @@
+{
+  "meta": {
+    "generated_at": "2026-03-01T01:27:05.033635Z",
+    "equipment_id": "INJ-02",
+    "equipment_type": "cnc",
+    "as_of": "2026-03-01T01:27:05.024036Z"
+  },
+  "input": {
+    "equipment": {
+      "equipment_id": "INJ-02",
+      "equipment_type": "cnc",
+      "replacement_value": 350000.0,
+      "age_years": 6.0,
+      "mtbf_hours": 45000.0,
+      "criticality": 3,
+      "redundancy": false,
+      "environment_severity": 3
+    },
+    "maintenance": {
+      "gmao_present": true,
+      "preventive_compliance": 1.0,
+      "mean_response_days": 3.0,
+      "spare_parts_ready": false,
+      "last_major_overhaul_days": 233
+    },
+    "data_quality": {
+      "completeness": 2.0,
+      "latency_seconds": 34.0,
+      "calibration_age_days": 150,
+      "drift_flag": false,
+      "outlier_rate": 0.02
+    },
+    "features": {
+      "vibration": {
+        "mean": 2.5,
+        "std": 0.3,
+        "min": 2.0,
+        "max": 4.0,
+        "slope_per_day": 0.1,
+        "last": 2.8
+      },
+      "temperature": {
+        "mean": 45.0,
+        "std": 4,
+        "min": 40,
+        "max": 80,
+        "slope_per_day": 0.2,
+        "last": 55.0
+      },
+      "electrical_current": {
+        "mean": 200.0,
+        "std": 15,
+        "min": 180,
+        "max": 300,
+        "slope_per_day": 0.1,
+        "last": 230.0
+      },
+      "power_factor_last": 0.95,
+      "thd_last": 5.0
+    },
+    "as_of": "2026-03-01T01:27:05.024036Z"
+  },
+  "decision": {
+    "decision": "ACCEPT",
+    "risk_tier": "B",
+    "recommended_deductible_hours": 72,
+    "recommended_limit_dm": 350000.0,
+    "recommended_limit_bi": 23013.69863013699,
+    "base_premium": 2744.28,
+    "adjusted_premium": 2744.28,
+    "clauses": [
+      "Reporting mensuel Health Score + alertes critiques.",
+      "Accès read-only aux logs IoT + journal des interventions maintenance."
+    ],
+    "drivers": [
+      "Health Score=64 (YELLOW)",
+      "P(fail 30d)=0.07%, RUL≈838 jours, hazard=LOW",
+      "DQ Score=90/100",
+      "Weibull ajusté: eta≈999j, beta≈2.07, proxy=0.29."
+    ]
+  }
+}

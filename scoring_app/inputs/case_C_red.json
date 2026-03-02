@@ -1,0 +1,33 @@
+{
+  "equipment": {
+    "equipment_id": "INJ-01",
+    "equipment_type": "Injection",
+    "replacement_value": 500000,
+    "age_years": 8,
+    "mtbf_hours": 40000,
+    "criticality": 5,
+    "redundancy": false,
+    "environment_severity": 3
+  },
+  "maintenance": {
+    "gmao_present": true,
+    "preventive_compliance": 0.82,
+    "mean_response_days": 10,
+    "spare_parts_ready": true,
+    "last_major_overhaul_days": 420
+  },
+  "data_quality": {
+    "completeness": 0.96,
+    "latency_seconds": 120,
+    "calibration_age_days": 240,
+    "drift_flag": false,
+    "outlier_rate": 0.02
+  },
+  "features": {
+    "vibration": { "mean": 2.5, "std": 0.3, "min": 1.9, "max": 4.2, "slope_per_day": 0.25, "last": 3.8 },
+    "temperature": { "mean": 48, "std": 4, "min": 40, "max": 85, "slope_per_day": 0.60, "last": 82 },
+    "electrical_current": { "mean": 250, "std": 20, "min": 220, "max": 340, "slope_per_day": 0.18, "last": 310 },
+    "power_factor_last": 0.88,
+    "thd_last": 12
+  }
+}

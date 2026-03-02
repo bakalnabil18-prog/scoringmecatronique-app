@@ -1,0 +1,25 @@
+RAPPORT DE SOUSCRIPTION – Panne Équipement + IoT + Maintenance Prédictive
+==============================================================================
+Équipement        : CNC-01 (CNC)
+Date analyse      : 2026-03-01T01:12:33.319894Z
+
+1) DÉCISION
+- Décision        : ACCEPT
+- Tier de risque   : A
+- Franchise temps  : 48 h
+
+2) PARAMÈTRES RECOMMANDÉS
+- Limite DM        : 350,000
+- Limite PE (BI)   : 23,014
+- Prime base       : 1,428.84
+- Prime ajustée    : 1,428.84
+
+3) CLAUSES / CONDITIONS
+- Reporting mensuel Health Score + alertes critiques.
+- Accès read-only aux logs IoT + journal des interventions maintenance.
+
+4) DRIVERS TECHNIQUES
+- Health Score=85 (GREEN)
+- P(fail 30d)=0.12%, RUL≈915 jours, hazard=LOW
+- DQ Score=93/100
+- Weibull ajusté: eta≈1113j, beta≈1.87, proxy=0.18.

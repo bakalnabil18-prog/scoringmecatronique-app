@@ -1,0 +1,25 @@
+RAPPORT DE SOUSCRIPTION – Panne Équipement + IoT + Maintenance Prédictive
+==============================================================================
+Équipement        : INJ-02 (cnc)
+Date analyse      : 2026-03-01T01:27:05.033635Z
+
+1) DÉCISION
+- Décision        : ACCEPT
+- Tier de risque   : B
+- Franchise temps  : 72 h
+
+2) PARAMÈTRES RECOMMANDÉS
+- Limite DM        : 350,000
+- Limite PE (BI)   : 23,014
+- Prime base       : 2,744.28
+- Prime ajustée    : 2,744.28
+
+3) CLAUSES / CONDITIONS
+- Reporting mensuel Health Score + alertes critiques.
+- Accès read-only aux logs IoT + journal des interventions maintenance.
+
+4) DRIVERS TECHNIQUES
+- Health Score=64 (YELLOW)
+- P(fail 30d)=0.07%, RUL≈838 jours, hazard=LOW
+- DQ Score=90/100
+- Weibull ajusté: eta≈999j, beta≈2.07, proxy=0.29.

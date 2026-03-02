@@ -1,0 +1,26 @@
+RAPPORT DE SOUSCRIPTION – Panne Équipement + IoT + Maintenance Prédictive
+==============================================================================
+Équipement        : EQ-01 (Machine)
+Date analyse      : 2026-03-01T02:32:49.399785Z
+
+1) DÉCISION
+- Décision        : ACCEPT_WITH_CONDITIONS
+- Tier de risque   : C
+- Franchise temps  : 120 h
+
+2) PARAMÈTRES RECOMMANDÉS
+- Limite DM        : 200,000
+- Limite PE (BI)   : 13,150
+- Prime base       : 3,400.00
+- Prime ajustée    : 3,910.00
+
+3) CLAUSES / CONDITIONS
+- Reporting mensuel Health Score + alertes critiques.
+- Recalibrer capteurs sous 30 jours.
+- Accès read-only aux logs IoT + journal des interventions maintenance.
+
+4) DRIVERS TECHNIQUES
+- Health Score=64 (YELLOW)
+- P(fail 30d)=0.06%, RUL≈824 jours
+- Health band=YELLOW
+- hazard=LOW

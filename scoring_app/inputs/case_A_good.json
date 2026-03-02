@@ -1,0 +1,33 @@
+{
+  "equipment": {
+    "equipment_id": "CNC-01",
+    "equipment_type": "CNC",
+    "replacement_value": 350000,
+    "age_years": 4,
+    "mtbf_hours": 50000,
+    "criticality": 3,
+    "redundancy": true,
+    "environment_severity": 2
+  },
+  "maintenance": {
+    "gmao_present": true,
+    "preventive_compliance": 0.92,
+    "mean_response_days": 5,
+    "spare_parts_ready": true,
+    "last_major_overhaul_days": 180
+  },
+  "data_quality": {
+    "completeness": 0.99,
+    "latency_seconds": 30,
+    "calibration_age_days": 120,
+    "drift_flag": false,
+    "outlier_rate": 0.01
+  },
+  "features": {
+    "vibration": { "mean": 2.2, "std": 0.2, "min": 1.8, "max": 2.9, "slope_per_day": 0.05, "last": 2.3 },
+    "temperature": { "mean": 45, "std": 3, "min": 38, "max": 55, "slope_per_day": 0.03, "last": 47 },
+    "electrical_current": { "mean": 180, "std": 12, "min": 160, "max": 210, "slope_per_day": 0.04, "last": 185 },
+    "power_factor_last": 0.96,
+    "thd_last": 4
+  }
+}

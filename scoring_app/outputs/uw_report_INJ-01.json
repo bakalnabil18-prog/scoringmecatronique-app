@@ -1,0 +1,91 @@
+{
+  "meta": {
+    "generated_at": "2026-03-01T01:12:33.346983Z",
+    "equipment_id": "INJ-01",
+    "equipment_type": "Injection",
+    "as_of": "2026-03-01T01:12:33.345598Z"
+  },
+  "input": {
+    "equipment": {
+      "equipment_id": "INJ-01",
+      "equipment_type": "Injection",
+      "replacement_value": 500000,
+      "age_years": 8,
+      "mtbf_hours": 40000,
+      "criticality": 5,
+      "redundancy": false,
+      "environment_severity": 3
+    },
+    "maintenance": {
+      "gmao_present": true,
+      "preventive_compliance": 0.82,
+      "mean_response_days": 10,
+      "spare_parts_ready": true,
+      "last_major_overhaul_days": 420
+    },
+    "data_quality": {
+      "completeness": 0.96,
+      "latency_seconds": 120,
+      "calibration_age_days": 240,
+      "drift_flag": false,
+      "outlier_rate": 0.02
+    },
+    "features": {
+      "vibration": {
+        "mean": 2.5,
+        "std": 0.3,
+        "min": 1.9,
+        "max": 4.2,
+        "slope_per_day": 0.25,
+        "last": 3.8
+      },
+      "temperature": {
+        "mean": 48,
+        "std": 4,
+        "min": 40,
+        "max": 85,
+        "slope_per_day": 0.6,
+        "last": 82
+      },
+      "electrical_current": {
+        "mean": 250,
+        "std": 20,
+        "min": 220,
+        "max": 340,
+        "slope_per_day": 0.18,
+        "last": 310
+      },
+      "power_factor_last": 0.88,
+      "thd_last": 12
+    },
+    "as_of": "2026-03-01T01:12:33.345598Z"
+  },
+  "decision": {
+    "decision": "ACCEPT_WITH_CONDITIONS",
+    "risk_tier": "C",
+    "recommended_deductible_hours": 120,
+    "recommended_limit_dm": 500000,
+    "recommended_limit_bi": 32876.71232876713,
+    "base_premium": 8470.000000000002,
+    "adjusted_premium": 13552.000000000004,
+    "clauses": [
+      "Maintenance urgente sous 7 jours + re-audit avant maintien couverture.",
+      "Révision trimestrielle obligatoire (Health Score + P(panne)).",
+      "Accès read-only aux logs IoT + journal des interventions maintenance."
+    ],
+    "drivers": [
+      "Health Score=8 (RED)",
+      "P(fail 30d)=25.00%, RUL≈528 jours, hazard=HIGH",
+      "DQ Score=84/100",
+      "Power factor bas (<0.90) → déséquilibre/charge réactive.",
+      "THD élevé (>10%) → harmoniques / risque défaut électrique.",
+      "Vibration élevée vs baseline → roulements/désalignement probable.",
+      "Température élevée vs baseline → surchauffe / lubrification/refroidissement.",
+      "Tendance vibration en hausse (dégradation accélérée).",
+      "Tendance température en hausse (risque imminent).",
+      "Override UW: Health RED ⇒ plancher de risque appliqué.",
+      "Health band RED pénalise le risque (score=8).",
+      "Weibull ajusté: eta≈602j, beta≈2.80, proxy=0.65."
+    ]
+  }
+}

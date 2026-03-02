@@ -1,0 +1,34 @@
+RAPPORT DE SOUSCRIPTION – Panne Équipement + IoT + Maintenance Prédictive
+==============================================================================
+Équipement        : INJ-01 (Injection)
+Date analyse      : 2026-03-01T01:12:33.346983Z
+
+1) DÉCISION
+- Décision        : ACCEPT_WITH_CONDITIONS
+- Tier de risque   : C
+- Franchise temps  : 120 h
+
+2) PARAMÈTRES RECOMMANDÉS
+- Limite DM        : 500,000
+- Limite PE (BI)   : 32,877
+- Prime base       : 8,470.00
+- Prime ajustée    : 13,552.00
+
+3) CLAUSES / CONDITIONS
+- Maintenance urgente sous 7 jours + re-audit avant maintien couverture.
+- Révision trimestrielle obligatoire (Health Score + P(panne)).
+- Accès read-only aux logs IoT + journal des interventions maintenance.
+
+4) DRIVERS TECHNIQUES
+- Health Score=8 (RED)
+- P(fail 30d)=25.00%, RUL≈528 jours, hazard=HIGH
+- DQ Score=84/100
+- Power factor bas (<0.90) → déséquilibre/charge réactive.
+- THD élevé (>10%) → harmoniques / risque défaut électrique.
+- Vibration élevée vs baseline → roulements/désalignement probable.
+- Température élevée vs baseline → surchauffe / lubrification/refroidissement.
+- Tendance vibration en hausse (dégradation accélérée).
+- Tendance température en hausse (risque imminent).
+- Override UW: Health RED ⇒ plancher de risque appliqué.
+- Health band RED pénalise le risque (score=8).
+- Weibull ajusté: eta≈602j, beta≈2.80, proxy=0.65.

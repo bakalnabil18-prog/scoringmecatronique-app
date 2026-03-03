@@ -191,11 +191,6 @@ def score_maintenance_maturity(
     maintenance_backlog_ratio: float,  # 0-1
     technician_training_level: int,  # 1-5
     spare_parts_availability: int,  # 1=poor, 2=basic, 3=good, 4=excellent
-    mean_response_days: float,  # délai moyen de prise en charge (jours)
-    maintenance_system: str,  # "papier_excel" / "gmao_standalone" / "erp_pm" / "eam" / "iiot_predictive"
-    handling_equipment_level: int,  # 1-4 (outillage de manutention maintenance)
-    spare_parts_storage_maturity: int,  # 1-4 (organisation stockage)
-    kitting_on_demand: bool,  # préparation pièces selon demande / bon de travail
 ) -> MaintenanceScore:
     """
     Scoring de la maturité de maintenance.
@@ -340,127 +335,21 @@ def score_maintenance_maturity(
     
     details['parts_score'] = parts_score
     
+    # --- Global maintenance ---
+    maintenance_score = np.mean([
+        strategy_score * 0.25,
+        gmao_score * 0.15,
+        pm_score * 0.2,
+        team_score * 0.15,
+        contract_score * 0.1,
+        freq_score * 0.1,
+        backlog_score * 0.1,
+        training_score * 0.1,
+        parts_score * 0.1
+    ])
     
-    # --- Intervention efficiency (mean response / prise en charge) ---
-    if mean_response_days <= 1:
-        intervention_score = 95
-        drivers.append("✓✓ Intervention très rapide (≤ 1 jour) → MTTR réduit")
-    elif mean_response_days <= 3:
-        intervention_score = 85
-        drivers.append("✓ Intervention rapide (≤ 3 jours)")
-    elif mean_response_days <= 7:
-        intervention_score = 70
-        drivers.append("⚠ Intervention moyenne (≤ 7 jours)")
-    elif mean_response_days <= 14:
-        intervention_score = 55
-        drivers.append("⚠ Intervention lente (≤ 14 jours) → risque PE accru")
-    else:
-        intervention_score = 35
-        drivers.append("❌ Intervention très lente (> 14 jours) → risque perte d'exploitation élevé")
-    details['intervention_score'] = intervention_score
-
-    # --- Maintenance system maturity (ordre d'évolution) ---
-    system_scores = {
-        "papier_excel": 35,        # registre papier / Excel
-        "gmao_standalone": 65,     # GMAO indépendante
-        "erp_pm": 80,              # module maintenance dans ERP (ex: SAP PM)
-        "eam": 88,                 # EAM / CMMS enterprise (ex: IBM Maximo)
-        "iiot_predictive": 95      # plateforme IIoT + analytics prédictif
-    }
-    system_score = system_scores.get(maintenance_system, 35)
-
-    system_labels = {
-        "papier_excel": "Papier/Excel",
-        "gmao_standalone": "GMAO standalone",
-        "erp_pm": "ERP (module maintenance/PM)",
-        "eam": "EAM (ex: Maximo)",
-        "iiot_predictive": "IIoT + Prédictif"
-    }
-
-    if maintenance_system == "papier_excel":
-        drivers.append("❌ Système maintenance Papier/Excel → traçabilité faible")
-    elif maintenance_system == "gmao_standalone":
-        drivers.append("✓ GMAO standalone → planification et historiques")
-    elif maintenance_system == "erp_pm":
-        drivers.append("✓✓ ERP maintenance (PM) → intégration achats/stock/production")
-    elif maintenance_system == "eam":
-        drivers.append("✓✓ EAM (type Maximo) → gouvernance maintenance avancée")
-    else:
-        drivers.append("✓✓ IIoT + prédictif → optimisation continue et détection précoce")
-    details['maintenance_system_score'] = system_score
-    details['maintenance_system_label'] = system_labels.get(maintenance_system, maintenance_system)
-
-    # --- Handling equipment for maintenance / manutention ---
-    handling_scores = {1: 35, 2: 60, 3: 80, 4: 95}
-    handling_score = handling_scores.get(handling_equipment_level, 35)
-
-    if handling_equipment_level == 1:
-        drivers.append("⚠ Outillage manutention maintenance faible → interventions risquées/lentes")
-    elif handling_equipment_level == 2:
-        drivers.append("✓ Manutention basique (palans/chariots) → capacité limitée")
-    elif handling_equipment_level == 3:
-        drivers.append("✓✓ Manutention adaptée (levage sécurisé, accès) → MTTR réduit")
-    else:
-        drivers.append("✓✓ Manutention avancée (nacelles, levage certifié) → sécurité & rapidité")
-    details['handling_score'] = handling_score
-
-    # --- Spare parts storage maturity (organisation + traçabilité) ---
-    storage_scores = {1: 35, 2: 60, 3: 80, 4: 95}
-    storage_score = storage_scores.get(spare_parts_storage_maturity, 35)
-
-    if spare_parts_storage_maturity == 1:
-        drivers.append("❌ Stock pièces non structuré → ruptures & erreurs")
-    elif spare_parts_storage_maturity == 2:
-        drivers.append("⚠ Stock structuré basique (emplacements) → visibilité partielle")
-    elif spare_parts_storage_maturity == 3:
-        drivers.append("✓ Stock géré (min/max, criticité) → disponibilité améliorée")
-    else:
-        drivers.append("✓✓ Stock optimisé (ABC/criticité, traçabilité) → arrêt réduit")
-    details['storage_score'] = storage_score
-
-    # --- Kitting / préparation pièces selon demande ---
-    kitting_score = 90 if kitting_on_demand else 55
-    if kitting_on_demand:
-        drivers.append("✓ Préparation pièces à la demande (kitting) → intervention plus efficace")
-    else:
-        drivers.append("⚠ Pas de kitting → pertes de temps lors des interventions")
-    details['kitting_score'] = kitting_score
-
-    # --- Global maintenance (pondéré) ---
-    weights = {
-        "strategy": 0.18,
-        "gmao": 0.10,
-        "pm": 0.14,
-        "team": 0.10,
-        "contract": 0.06,
-        "frequency": 0.07,
-        "backlog": 0.07,
-        "training": 0.06,
-        "parts_availability": 0.07,
-        "system": 0.07,
-        "handling": 0.04,
-        "storage": 0.04,
-        "kitting": 0.03,
-        "intervention": 0.07,
-    }
-    numerator = (
-        strategy_score * weights["strategy"] +
-        gmao_score * weights["gmao"] +
-        pm_score * weights["pm"] +
-        team_score * weights["team"] +
-        contract_score * weights["contract"] +
-        freq_score * weights["frequency"] +
-        backlog_score * weights["backlog"] +
-        training_score * weights["training"] +
-        parts_score * weights["parts_availability"] +
-        system_score * weights["system"] +
-        handling_score * weights["handling"] +
-        storage_score * weights["storage"] +
-        kitting_score * weights["kitting"] +
-        intervention_score * weights["intervention"]
-    )
-    maintenance_score = float(np.clip(numerator / sum(weights.values()), 0, 100))
-
+    maintenance_score = float(np.clip(maintenance_score, 0, 100))
+    
     return MaintenanceScore(
         score=maintenance_score,
         drivers=drivers,
@@ -684,22 +573,7 @@ def compute_advanced_scoring(
         recommendations.append("Évaluer redondance des fonctions critiques")
     if maintenance.score < 70:
         recommendations.append("Passer à une stratégie préventive/prédictive")
-        recommendations.append("Déployer une GMAO opérationnelle / module ERP maintenance")
-    # Recos ciblées (prévention)
-    ms = maintenance.details.get("maintenance_system_score", 100)
-    storage = maintenance.details.get("storage_score", 100)
-    handling = maintenance.details.get("handling_score", 100)
-    intervention = maintenance.details.get("intervention_score", 100)
-
-    if ms < 70:
-        recommendations.append("Monter en maturité système maintenance (GMAO → ERP PM → EAM/IIoT)")
-    if storage < 70:
-        recommendations.append("Structurer le magasin pièces (criticité, min/max, traçabilité)")
-    if handling < 70:
-        recommendations.append("Renforcer les moyens de manutention/levage pour maintenance (sécurité + MTTR)")
-    if intervention < 70:
-        recommendations.append("Améliorer la réactivité intervention (SLA, astreintes, priorisation)")
-
+        recommendations.append("Déployer une GMAO opérationnelle")
     if governance.score < 70:
         recommendations.append("Formaliser procédures maintenance")
         recommendations.append("Mettre en place un PCA testé")

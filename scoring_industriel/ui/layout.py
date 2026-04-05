@@ -256,15 +256,10 @@ def render_app():
                     st.rerun()
             else:
                 if st.button("✅ Valider et Calculer", use_container_width=True):
-                    # ══ CORRECTION BUG : snapshot figé au moment du clic ══
-                    # On capture l'état courant dans un dict séparé
-                    snapshot = {
-                        k: v for k, v in st.session_state.items()
-                        if not k.startswith("_") and k not in ("step", "result", "calculated")
-                    }
-                    data = normalise_form(snapshot)
+                    # Lire depuis form_data — contient TOUTES les étapes
+                    fd = st.session_state.get("form_data", {})
+                    data = normalise_form(fd)
                     pipeline = ScoringPipeline()
-                    # Stocker le résultat dans _frozen_result (jamais retouché ensuite)
                     st.session_state._frozen_result = pipeline.run(data)
                     st.session_state.result = st.session_state._frozen_result
                     st.session_state.calculated = True
@@ -278,6 +273,7 @@ def render_app():
                 st.session_state._frozen_result = None
                 st.session_state.calculated = False
                 st.session_state.step = 0
+                st.session_state.form_data = {}
                 st.rerun()
 
     # ── DASHBOARD DROIT ──────────────────────────────────────────────────────
@@ -364,11 +360,8 @@ def render_app():
             with tab_fair:
                 from engine.fair_model import compute_fair_analysis
                 from engine.normaliser import normalise_form
-                snapshot = {
-                    k: v for k, v in st.session_state.items()
-                    if not k.startswith("_") and k not in ("step", "result", "calculated")
-                }
-                data_fair = normalise_form(snapshot)
+                fd_fair = st.session_state.get("form_data", {})
+                data_fair = normalise_form(fd_fair)
                 fair_result = compute_fair_analysis(data_fair, result)
                 render_fair_analysis(fair_result)
 

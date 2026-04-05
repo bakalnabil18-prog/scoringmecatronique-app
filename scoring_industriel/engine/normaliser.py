@@ -17,11 +17,23 @@ from .data_models import (
 
 
 def _bool_field(val) -> str:
-    """Convertit un widget Streamlit (True/False/str) en 'oui'/'non'."""
+    """Convertit un widget Streamlit (True/False/str) en 'oui'/'non'.
+
+    Gère les formats Streamlit :
+      - True/False (checkbox)
+      - "✅ Oui" / "❌ Non" (selectbox avec emojis)
+      - "oui" / "non" (string brute)
+    """
     if isinstance(val, bool):
         return "oui" if val else "non"
     if isinstance(val, str):
-        return val.lower().strip()
+        v = val.lower().strip()
+        # Retirer les emojis et espaces : "✅ oui" → "oui", "❌ non" → "non"
+        if "oui" in v:
+            return "oui"
+        if "non" in v:
+            return "non"
+        return v
     return ""
 
 

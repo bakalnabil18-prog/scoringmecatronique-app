@@ -1,261 +1,162 @@
 """
-normaliser.py — Normalisation des entrées Streamlit vers FormData
+pipeline.py
+═══════════════════════════════════════════════════════════════════
+Pipeline de scoring complet v2 — avec 20 indicateurs innovants.
+
+Flux :
+  FormData
+    → compute_score_maturite()      → Score A (base)
+    → compute_score_resilience()    → Score B (base)
+    → compute_score_vulnerabilite() → Score C (base)
+    → compute_module_scores()       → Radar 8 axes
+    → compute_innovant_scores()     → Bonus/Malus 20 indicateurs
+    → apply_innovant_to_pipeline()  → Scores finaux A, B, C, Global
+    → detect_zones_critiques()      → Output D
+    → generate_recommandations()    → Recommandations
+    → build_synthese()              → Synthèse souscripteur
+    → ScoreResult
 """
 
-from .data_models import (
-    FormData, Identification,
-    ModuleRobots, RobotsIdentification, RobotsQuantitatif, RobotsScoring,
-    ModuleCNC, CNCIdentification, CNCTechnique, CNCRisque,
-    ModuleCPS, CPSArchitecture, CPSInfrastructureIT, CPSAssurantiel,
-    ModuleElectrique, ElectriqueEquipement, ElectriqueDonnees, ElectriqueImpact,
-    ModuleMaintenance, MaintenanceOrganisation, MaintenanceIndicateurs, MaintenanceMaturite,
-    ModuleManutention, ManutentionEquipements, ManutentionScoring,
-    ModuleStockage, StockageInfrastructure, StockageGestionNumerique,
-    StockagePerformance, StockageAssurantiel,
-    ModuleIntervention, InterventionOrganisation, InterventionIndicateurs, InterventionDigitalisation,
+from .data_models import FormData, ScoreResult
+from .scoring_mecatronique import compute_score_maturite
+from .scoring_maintenance import compute_score_resilience
+from .scoring_gouvernance import compute_score_vulnerabilite
+from .health_score import compute_module_scores
+from .risk_matrix import detect_zones_critiques
+from .recommendation_engine import generate_recommandations
+from .underwriting import (
+    build_synthese,
+    get_facteurs_aggravants,
+    compute_benchmark_secteur,
+    get_profil,
+    get_niveau_risque,
+)
+from .scoring_innovant import (
+    InnovatifInput,
+    compute_innovant_scores,
+    apply_innovant_to_pipeline,
 )
 
 
-def _bool_field(val) -> str:
-    """Convertit un widget Streamlit (True/False/str) en 'oui'/'non'."""
-    if isinstance(val, bool):
-        return "oui" if val else "non"
-    if isinstance(val, str):
-        return val.lower().strip()
-    return ""
-
-
-def _safe_float(val) -> float:
-    """Conversion sécurisée en float."""
-    try:
-        return float(val) if val not in (None, "", 0) else None
-    except (ValueError, TypeError):
-        return None
-
-
-def _safe_int(val) -> int:
-    try:
-        return int(val) if val not in (None, "") else None
-    except (ValueError, TypeError):
-        return None
-
-
-def normalise_form(state: dict) -> FormData:
+class ScoringPipeline:
     """
-    Convertit le dictionnaire de session Streamlit (st.session_state)
-    en objet FormData structuré pour le moteur de scoring.
-
-    Parameters
-    ----------
-    state : dict
-        Dictionnaire plat {clé: valeur} issu des widgets Streamlit.
-
-    Returns
-    -------
-    FormData
-        Objet de données structuré et validé.
+    Pipeline principal de scoring risque industriel 4.0 v2.
+    Supporte les 20 indicateurs innovants via innovant_input optionnel.
     """
-    s = state  # alias court
 
-    return FormData(
-        identification=Identification(
-            entreprise=s.get("entreprise", ""),
-            secteur=s.get("secteur", ""),
-            ville=s.get("ville", ""),
-            effectif=_safe_int(s.get("effectif")),
-            ca_annuel_mad=_safe_float(s.get("ca_annuel_mad")),
-        ),
+    def run(self, data: FormData, innovant_input: InnovatifInput = None) -> ScoreResult:
+        result = ScoreResult()
 
-        robots=ModuleRobots(
-            identification=RobotsIdentification(
-                type_robot=s.get("type_robot", ""),
-                cobots=_bool_field(s.get("cobots")),
-                cellule_modulaire=_bool_field(s.get("cellule_modulaire")),
-                marque_modele=s.get("marque_modele", ""),
-                annee_install=_safe_int(s.get("annee_install")),
-                integration_reseau=s.get("integration_reseau", ""),
-            ),
-            quantitatif=RobotsQuantitatif(
-                nombre_robots=_safe_int(s.get("nombre_robots")),
-                valeur_unitaire_mad=_safe_float(s.get("valeur_unitaire_mad")),
-                valeur_totale_parc_mad=_safe_float(s.get("valeur_totale_parc_mad")),
-                heures_fonct_an=_safe_float(s.get("heures_fonct_an")),
-                mtbf_heures=_safe_float(s.get("mtbf_robots")),
-                mttr_heures=_safe_float(s.get("mttr_robots")),
-            ),
-            scoring=RobotsScoring(
-                niveau_redondance=s.get("niveau_redondance", ""),
-                contrat_maintenance=_bool_field(s.get("contrat_maintenance")),
-                maj_firmware=_bool_field(s.get("maj_firmware")),
-                historique_pannes=s.get("historique_pannes", ""),
-                capteurs_predictifs=_bool_field(s.get("capteurs_predictifs")),
-                dependance_production=s.get("dependance_production", ""),
-            ),
-        ),
+        # ── 1. TROIS INDICES DE BASE ─────────────────────────────────────────
+        result.score_maturite      = compute_score_maturite(data)
+        result.score_resilience    = compute_score_resilience(data)
+        result.score_vulnerabilite = compute_score_vulnerabilite(data)
 
-        cnc=ModuleCNC(
-            identification=CNCIdentification(
-                type_cnc=s.get("type_cnc", ""),
-                marque=s.get("marque_cnc", ""),
-                annee_fabrication=_safe_int(s.get("annee_cnc")),
-                automation_cnc=s.get("automation_cnc", ""),
-                interface_mes_erp=_bool_field(s.get("interface_mes_erp")),
-            ),
-            technique=CNCTechnique(
-                nombre_cnc=_safe_int(s.get("nombre_cnc")),
-                valeur_unitaire_mad=_safe_float(s.get("valeur_unit_cnc")),
-                heures_cumul=_safe_float(s.get("heures_cumul_cnc")),
-                type_refroid=s.get("type_refroid", ""),
-                sensibilite_electrique=_bool_field(s.get("sensibilite_electrique")),
-                variateur_freq=_bool_field(s.get("variateur_freq")),
-            ),
-            risque=CNCRisque(
-                freq_maintenance_prev=s.get("freq_maintenance_prev", ""),
-                maintenance_pred_cnc=_bool_field(s.get("maintenance_pred_cnc")),
-                historique_dom_elec=s.get("historique_dom_elec", ""),
-                protection_surtension=_bool_field(s.get("protection_surtension")),
-                ups_dedie=_bool_field(s.get("ups_dedie")),
-            ),
-        ),
+        # Garder les scores de base pour affichage comparatif
+        result.score_maturite_base      = result.score_maturite
+        result.score_resilience_base    = result.score_resilience
+        result.score_vulnerabilite_base = result.score_vulnerabilite
 
-        cps=ModuleCPS(
-            architecture=CPSArchitecture(
-                presence_scada=_bool_field(s.get("presence_scada")),
-                mes_integre=_bool_field(s.get("mes_integre")),
-                erp_connecte=_bool_field(s.get("erp_connecte")),
-                cloud_externe=_bool_field(s.get("cloud_externe")),
-                protocole_industriel=s.get("protocole_industriel", ""),
-                segmentation_reseau=s.get("segmentation_reseau", ""),
-            ),
-            infrastructure_it=CPSInfrastructureIT(
-                type_serveurs=s.get("type_serveurs", ""),
-                redondance_serveurs=_bool_field(s.get("redondance_serveurs")),
-                backup_quotidien=_bool_field(s.get("backup_quotidien")),
-                rto_heures=_safe_float(s.get("rto_heures")),
-                parefeu_industriel=_bool_field(s.get("parefeu_industriel")),
-                audit_cyber=_bool_field(s.get("audit_cyber")),
-            ),
-            assurantiel=CPSAssurantiel(
-                dependance_cps=s.get("dependance_cps", ""),
-                historique_incid_it=s.get("historique_incid_it", ""),
-                temps_moy_arret_it_h=_safe_float(s.get("temps_moy_arret_it_h")),
-                plan_continuite=_bool_field(s.get("plan_continuite")),
-                simulation_crise=_bool_field(s.get("simulation_crise")),
-            ),
-        ),
+        # ── 2. INDICATEURS INNOVANTS ─────────────────────────────────────────
+        if innovant_input is not None:
+            inno = compute_innovant_scores(innovant_input)
+            result.innovant_scores = inno
+            (
+                result.score_maturite,
+                result.score_resilience,
+                result.score_vulnerabilite,
+                _,
+            ) = apply_innovant_to_pipeline(
+                result.score_maturite,
+                result.score_resilience,
+                result.score_vulnerabilite,
+                inno,
+            )
+        else:
+            result.innovant_scores = None
 
-        electrique=ModuleElectrique(
-            equipement=ElectriqueEquipement(
-                tableau_bt_mt=_bool_field(s.get("tableau_bt_mt")),
-                protection_diff=_bool_field(s.get("protection_diff")),
-                monitoring_energie=_bool_field(s.get("monitoring_energie")),
-                ups_industriel=_bool_field(s.get("ups_industriel")),
-                groupe_electrogene=_bool_field(s.get("groupe_electrogene")),
-            ),
-            donnees=ElectriqueDonnees(
-                puissance_installee_kw=_safe_float(s.get("puissance_installee_kw")),
-                taux_charge_moyen_pct=_safe_float(s.get("taux_charge_moyen_pct")),
-                incidents_electriques=s.get("incidents_electriques", ""),
-                mise_a_la_terre=_bool_field(s.get("mise_a_la_terre")),
-            ),
-            impact=ElectriqueImpact(
-                vulnerabilite_dom_elec=s.get("vulnerabilite_dom_elec", ""),
-                risque_court_circuit=_bool_field(s.get("risque_court_circuit")),
-                risque_propag_incendie=s.get("risque_propag_incendie", ""),
-            ),
-        ),
+        # ── 3. SCORE GLOBAL ──────────────────────────────────────────────────
+        result.score_global = min(100, max(0, round(
+            result.score_maturite * 0.35
+            + result.score_resilience * 0.45
+            + (100 - result.score_vulnerabilite) * 0.20
+        )))
 
-        maintenance=ModuleMaintenance(
-            organisation=MaintenanceOrganisation(
-                gmao_utilisee=_bool_field(s.get("gmao_utilisee")),
-                type_maintenance=s.get("type_maintenance", ""),
-                existence_kpi=_bool_field(s.get("existence_kpi")),
-            ),
-            indicateurs=MaintenanceIndicateurs(
-                mtbf_global=_safe_float(s.get("mtbf_global")),
-                mttr_global=_safe_float(s.get("mttr_global")),
-                taux_maint_planifie_pct=_safe_float(s.get("taux_maint_planifie_pct")),
-                taux_respect_planning_pct=_safe_float(s.get("taux_respect_planning_pct")),
-                budget_maintenance_pct_parc=_safe_float(s.get("budget_maintenance_pct_parc")),
-            ),
-            maturite=MaintenanceMaturite(
-                niveau_digitalisation=s.get("niveau_digitalisation", ""),
-                maint_conditionnelle=_bool_field(s.get("maint_conditionnelle")),
-                ia_predictive=_bool_field(s.get("ia_predictive")),
-            ),
-        ),
+        result.score_global_base = min(100, max(0, round(
+            result.score_maturite_base * 0.35
+            + result.score_resilience_base * 0.45
+            + (100 - result.score_vulnerabilite_base) * 0.20
+        )))
 
-        manutention=ModuleManutention(
-            equipements=ManutentionEquipements(
-                presence_agv=_bool_field(s.get("presence_agv")),
-                chariots_elev=_bool_field(s.get("chariots_elev")),
-                ponts_roulants=_bool_field(s.get("ponts_roulants")),
-                palans_elec=_bool_field(s.get("palans_elec")),
-                outillage_special=_bool_field(s.get("outillage_special")),
-                atelier_interne=_bool_field(s.get("atelier_interne")),
-                nombre_equip=_safe_int(s.get("nombre_equip_manu")),
-                age_moyen_ans=_safe_float(s.get("age_moyen_manu")),
-                disponibilite_pct=_safe_float(s.get("disponibilite_manu_pct")),
-                temps_mobilisation_min=_safe_float(s.get("temps_mobilisation_min")),
-            ),
-            scoring=ManutentionScoring(
-                manutention_auto=_bool_field(s.get("manutention_auto")),
-                redond_equip_crit=_bool_field(s.get("redond_equip_crit")),
-                disponibilite_247=_bool_field(s.get("disponibilite_247")),
-                dependance_prestataire=_bool_field(s.get("dependance_prestataire")),
-            ),
-        ),
+        # ── 4. SCORES PAR MODULE (radar) ──────────────────────────────────────
+        result.module_scores = compute_module_scores(data)
 
-        stockage=ModuleStockage(
-            infrastructure=StockageInfrastructure(
-                magasin_central=_bool_field(s.get("magasin_central")),
-                rayonnage_intelligent=_bool_field(s.get("rayonnage_intelligent")),
-                stockage_vertical_auto=_bool_field(s.get("stockage_vertical_auto")),
-                zone_pieces_crit=_bool_field(s.get("zone_pieces_crit")),
-                controle_therm_humi=_bool_field(s.get("controle_therm_humi")),
-            ),
-            gestion_numerique=StockageGestionNumerique(
-                integration_erp_stock=_bool_field(s.get("integration_erp_stock")),
-                stock_minimum_defini=_bool_field(s.get("stock_minimum_defini")),
-                analyse_abc=_bool_field(s.get("analyse_abc")),
-                delai_reappro_jours=_safe_float(s.get("delai_reappro_jours")),
-                taux_rupture_stock=s.get("taux_rupture_stock", ""),
-                suivi_consommation=_bool_field(s.get("suivi_consommation")),
-            ),
-            performance=StockagePerformance(
-                temps_moy_disp_piece_h=_safe_float(s.get("temps_moy_disp_piece_h")),
-                pct_pieces_crit_stock=_safe_float(s.get("pct_pieces_crit_stock")),
-                taux_rotation_stock=_safe_float(s.get("taux_rotation_stock")),
-                valeur_stock_pct_parc=_safe_float(s.get("valeur_stock_pct_parc")),
-                prediction_conso=_bool_field(s.get("prediction_conso")),
-            ),
-            assurantiel=StockageAssurantiel(
-                pieces_crit_redond=_bool_field(s.get("pieces_crit_redond")),
-                fournisseurs_multiples=_bool_field(s.get("fournisseurs_multiples")),
-                contrat_appro_prio=_bool_field(s.get("contrat_appro_prio")),
-                simulation_penurie=_bool_field(s.get("simulation_penurie")),
-            ),
-        ),
+        # ── 5. PROFIL & RISQUE ────────────────────────────────────────────────
+        profil = get_profil(result.score_global)
+        risque = get_niveau_risque(result.score_global)
+        result.profil_industriel = profil["label"]
+        result.niveau_risque     = risque["label"]
 
-        intervention=ModuleIntervention(
-            organisation=InterventionOrganisation(
-                equipe_interne=_bool_field(s.get("equipe_interne")),
-                techniciens_certif=_bool_field(s.get("techniciens_certif")),
-                astreinte_247=_bool_field(s.get("astreinte_247")),
-                sla_interne_h=_safe_float(s.get("sla_interne_h")),
-            ),
-            indicateurs=InterventionIndicateurs(
-                mttr_moyen=_safe_float(s.get("mttr_moyen")),
-                pct_interv_4h=_safe_float(s.get("pct_interv_4h")),
-                pct_interv_planif=_safe_float(s.get("pct_interv_planif")),
-                taux_resolution_pp=_safe_float(s.get("taux_resolution_pp")),
-                historique_arret_24h=_safe_int(s.get("historique_arret_24h")),
-            ),
-            digitalisation=InterventionDigitalisation(
-                gmao_mobile=_bool_field(s.get("gmao_mobile")),
-                tracabilite_rt=_bool_field(s.get("tracabilite_rt")),
-                historique_pannes_analyse=_bool_field(s.get("historique_pannes_analyse")),
-                dashboard_kpi=_bool_field(s.get("dashboard_kpi")),
-            ),
-        ),
-    )
+        # ── 6. OUTPUT D — ZONES CRITIQUES ─────────────────────────────────────
+        result.zones_critiques = detect_zones_critiques(data, result)
+
+        # ── 7. RECOMMANDATIONS ────────────────────────────────────────────────
+        result.recommandations = generate_recommandations(data, result)
+
+        # ── 8. SYNTHÈSE SOUSCRIPTEUR ──────────────────────────────────────────
+        result.synthese = build_synthese(data, result)
+
+        # ── 9. FACTEURS AGGRAVANTS ────────────────────────────────────────────
+        result.facteurs_aggravants = get_facteurs_aggravants(data, result)
+
+        # ── 10. BENCHMARK SECTORIEL ───────────────────────────────────────────
+        result.benchmark_secteur = compute_benchmark_secteur(data, result)
+
+        return result
+
+    def run_partial(self, data: FormData, innovant_input: InnovatifInput = None) -> ScoreResult:
+        """Version allégée pour calcul temps réel (live dashboard)."""
+        result = ScoreResult()
+
+        result.score_maturite      = compute_score_maturite(data)
+        result.score_resilience    = compute_score_resilience(data)
+        result.score_vulnerabilite = compute_score_vulnerabilite(data)
+
+        result.score_maturite_base      = result.score_maturite
+        result.score_resilience_base    = result.score_resilience
+        result.score_vulnerabilite_base = result.score_vulnerabilite
+
+        if innovant_input is not None:
+            inno = compute_innovant_scores(innovant_input)
+            result.innovant_scores = inno
+            (
+                result.score_maturite,
+                result.score_resilience,
+                result.score_vulnerabilite,
+                _,
+            ) = apply_innovant_to_pipeline(
+                result.score_maturite,
+                result.score_resilience,
+                result.score_vulnerabilite,
+                inno,
+            )
+        else:
+            result.innovant_scores = None
+
+        result.score_global = min(100, max(0, round(
+            result.score_maturite * 0.35
+            + result.score_resilience * 0.45
+            + (100 - result.score_vulnerabilite) * 0.20
+        )))
+
+        result.score_global_base = min(100, max(0, round(
+            result.score_maturite_base * 0.35
+            + result.score_resilience_base * 0.45
+            + (100 - result.score_vulnerabilite_base) * 0.20
+        )))
+
+        result.module_scores = compute_module_scores(data)
+        profil = get_profil(result.score_global)
+        result.profil_industriel = profil["label"]
+
+        return result

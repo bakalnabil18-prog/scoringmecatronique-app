@@ -1,108 +1,145 @@
 """
-validators.py — Validation des données du formulaire
+recommendation_engine.py
+═══════════════════════
+Génère les recommandations techniques priorisées.
+Trois niveaux : Urgente / Prioritaire / Recommandée
 """
 
-from engine.data_models import FormData
+from .data_models import FormData, ScoreResult, Recommandation
 
 
-def validate_form(data: FormData) -> list[str]:
-    """
-    Valide les champs obligatoires et retourne la liste des erreurs.
-    Retourne [] si tout est valide.
-    """
-    errors = []
+def generate_recommandations(data: FormData, result: ScoreResult) -> list[Recommandation]:
+    recs = []
 
-    # Identification
-    if not data.identification.entreprise:
-        errors.append("Le nom de l'entreprise est obligatoire.")
-    if not data.identification.secteur or data.identification.secteur == "—":
-        errors.append("Le secteur d'activité est obligatoire.")
+    # ── URGENTES (score faible sur modules critiques) ────────
 
-    # Robots
-    if not data.robots.identification.type_robot or data.robots.identification.type_robot == "—":
-        errors.append("Le type de robot est obligatoire.")
-    if not data.robots.identification.integration_reseau or data.robots.identification.integration_reseau == "—":
-        errors.append("L'intégration réseau des robots est obligatoire.")
-    if not data.robots.scoring.niveau_redondance or data.robots.scoring.niveau_redondance == "—":
-        errors.append("Le niveau de redondance est obligatoire.")
-    if not data.robots.scoring.dependance_production or data.robots.scoring.dependance_production == "—":
-        errors.append("La dépendance production est obligatoire.")
+    if result.score_resilience < 40:
+        recs.append(Recommandation(
+            priorite="Urgente",
+            module="Maintenance",
+            action="Migrer vers une maintenance prédictive via IA — impact direct sur MTTR et perte d'exploitation.",
+            impact_estime="Réduction MTTR estimée 40-60%"
+        ))
 
-    # Maintenance
-    if not data.maintenance.organisation.type_maintenance or data.maintenance.organisation.type_maintenance == "—":
-        errors.append("Le type de maintenance est obligatoire.")
+    if data.cps.infrastructure_it.redondance_serveurs != "oui":
+        recs.append(Recommandation(
+            priorite="Urgente",
+            module="CPS",
+            action="Implémenter la redondance serveurs MES/SCADA — risque d'arrêt total de production.",
+            impact_estime="Réduction risque arrêt systémique de 70%"
+        ))
 
-    # CPS
-    if not data.cps.assurantiel.dependance_cps or data.cps.assurantiel.dependance_cps == "—":
-        errors.append("La dépendance au CPS est obligatoire.")
+    if data.electrique.donnees.mise_a_la_terre != "oui":
+        recs.append(Recommandation(
+            priorite="Urgente",
+            module="Électrique",
+            action="Mettre en conformité la mise à la terre selon norme NF C 15-100.",
+            impact_estime="Élimination risque dommage électrique grave"
+        ))
 
-    return errors
+    mttr = data.maintenance.indicateurs.mttr_global or 0
+    if mttr > 12:
+        recs.append(Recommandation(
+            priorite="Urgente",
+            module="Maintenance",
+            action=f"Réduire le MTTR global (actuellement {mttr:.1f}h) — cible sectorielle < 4h.",
+            impact_estime="Réduction durée sinistre directe"
+        ))
 
+    # ── PRIORITAIRES ─────────────────────────────────────────
 
-def compute_completeness(data: FormData) -> float:
-    """
-    Calcule le taux de complétion du formulaire (0.0 à 1.0).
-    """
-    total_fields = 0
-    filled_fields = 0
+    if data.cps.assurantiel.plan_continuite != "oui":
+        recs.append(Recommandation(
+            priorite="Prioritaire",
+            module="CPS",
+            action="Établir un Plan de Continuité d'Activité (PCA) avec simulation annuelle documentée.",
+            impact_estime="Réduction franchise perte d'exploitation"
+        ))
 
-    def _check(val):
-        nonlocal total_fields, filled_fields
-        total_fields += 1
-        if val not in (None, "", "—", 0):
-            filled_fields += 1
+    if data.cps.infrastructure_it.audit_cyber != "oui":
+        recs.append(Recommandation(
+            priorite="Prioritaire",
+            module="CPS",
+            action="Programmer un audit cybersécurité annuel sur l'infrastructure industrielle (IEC 62443).",
+            impact_estime="Couverture cyber améliorée"
+        ))
 
-    # Identification
-    _check(data.identification.entreprise)
-    _check(data.identification.secteur)
-    _check(data.identification.ville)
+    if data.stockage.assurantiel.pieces_crit_redond != "oui":
+        recs.append(Recommandation(
+            priorite="Prioritaire",
+            module="Stockage",
+            action="Constituer un stock de pièces critiques redondantes pour les équipements à longue durée d'approvisionnement.",
+            impact_estime="Réduction durée sinistre BDM de 30-50%"
+        ))
 
-    # Robots
-    _check(data.robots.identification.type_robot)
-    _check(data.robots.identification.cobots)
-    _check(data.robots.identification.integration_reseau)
-    _check(data.robots.quantitatif.nombre_robots)
-    _check(data.robots.quantitatif.mtbf_heures)
-    _check(data.robots.quantitatif.mttr_heures)
-    _check(data.robots.scoring.niveau_redondance)
-    _check(data.robots.scoring.capteurs_predictifs)
-    _check(data.robots.scoring.dependance_production)
+    if data.electrique.equipement.ups_industriel != "oui":
+        recs.append(Recommandation(
+            priorite="Prioritaire",
+            module="Électrique",
+            action="Installer un onduleur industriel (UPS) avec autonomie minimum 15 min sur circuits critiques.",
+            impact_estime="Protection dommages électriques"
+        ))
 
-    # CNC
-    _check(data.cnc.identification.automation_cnc)
-    _check(data.cnc.risque.freq_maintenance_prev)
-    _check(data.cnc.risque.ups_dedie)
+    if data.cps.architecture.segmentation_reseau in ("Faible", ""):
+        recs.append(Recommandation(
+            priorite="Prioritaire",
+            module="CPS",
+            action="Segmenter le réseau industriel (zones DMZ, VLAN par zone de sécurité).",
+            impact_estime="Containment incident cyber"
+        ))
 
-    # CPS
-    _check(data.cps.architecture.presence_scada)
-    _check(data.cps.infrastructure_it.redondance_serveurs)
-    _check(data.cps.infrastructure_it.backup_quotidien)
-    _check(data.cps.infrastructure_it.parefeu_industriel)
-    _check(data.cps.infrastructure_it.audit_cyber)
-    _check(data.cps.assurantiel.dependance_cps)
-    _check(data.cps.assurantiel.plan_continuite)
+    # ── RECOMMANDÉES ─────────────────────────────────────────
 
-    # Électrique
-    _check(data.electrique.equipement.ups_industriel)
-    _check(data.electrique.donnees.mise_a_la_terre)
-    _check(data.electrique.donnees.incidents_electriques)
+    if data.stockage.assurantiel.fournisseurs_multiples != "oui":
+        recs.append(Recommandation(
+            priorite="Recommandée",
+            module="Stockage",
+            action="Diversifier les fournisseurs de pièces critiques — minimum 2 fournisseurs homologués.",
+            impact_estime="Réduction risque pénurie"
+        ))
 
-    # Maintenance
-    _check(data.maintenance.organisation.type_maintenance)
-    _check(data.maintenance.organisation.gmao_utilisee)
-    _check(data.maintenance.indicateurs.mtbf_global)
-    _check(data.maintenance.indicateurs.mttr_global)
-    _check(data.maintenance.maturite.niveau_digitalisation)
-    _check(data.maintenance.maturite.ia_predictive)
+    if data.robots.scoring.niveau_redondance == "Faible":
+        recs.append(Recommandation(
+            priorite="Recommandée",
+            module="Robots",
+            action="Augmenter le niveau de redondance robotique (cellule de remplacement ou robot polyvalent en réserve).",
+            impact_estime="Réduction criticité robotique"
+        ))
 
-    # Stockage
-    _check(data.stockage.assurantiel.pieces_crit_redond)
-    _check(data.stockage.assurantiel.fournisseurs_multiples)
-    _check(data.stockage.gestion_numerique.taux_rupture_stock)
+    nd = int(data.maintenance.maturite.niveau_digitalisation or 0)
+    if nd < 3:
+        recs.append(Recommandation(
+            priorite="Recommandée",
+            module="Maintenance",
+            action="Déployer une GMAO complète avec module mobile et dashboard KPIs maintenance.",
+            impact_estime="Amélioration visibilité et planification"
+        ))
 
-    # Intervention
-    _check(data.intervention.organisation.astreinte_247)
-    _check(data.intervention.indicateurs.mttr_moyen)
-    _check(data.intervention.indicateurs.pct_interv_4h)
+    if data.manutention.equipements.presence_agv != "oui":
+        recs.append(Recommandation(
+            priorite="Recommandée",
+            module="Manutention",
+            action="Étudier l'intégration d'AGV pour réduire le temps de mobilisation lors d'interventions.",
+            impact_estime="Réduction MTTR de 20-30%"
+        ))
 
-    return round(filled_fields / total_fields, 2) if total_fields > 0 else 0.0
+    if data.intervention.organisation.astreinte_247 != "oui":
+        recs.append(Recommandation(
+            priorite="Recommandée",
+            module="Intervention",
+            action="Mettre en place une astreinte 24/7 pour les équipements à dépendance critique.",
+            impact_estime="Réduction MTTR hors heures ouvrées"
+        ))
+
+    if data.stockage.gestion_numerique.analyse_abc != "oui":
+        recs.append(Recommandation(
+            priorite="Recommandée",
+            module="Stockage",
+            action="Réaliser une analyse ABC des pièces de rechange pour optimiser le stock.",
+            impact_estime="Optimisation coût stockage 15-25%"
+        ))
+
+    # Limiter à 8 recommandations max, priorisées
+    order = {"Urgente": 0, "Prioritaire": 1, "Recommandée": 2}
+    recs.sort(key=lambda r: order.get(r.priorite, 3))
+    return recs[:8]

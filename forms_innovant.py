@@ -1,159 +1,208 @@
 """
-scoring_maintenance.py
-══════════════════════
-Score de Résilience Opérationnelle (0-100)
-Mesure : efficacité maintenance + pièces critiques + rapidité intervention + redondance
-Poids dans score global : 45%
+dashboard.py — Panneau de résultats en temps réel
+Affiche : Jauge + 3 indices + Radar + Feux tricolores + Zones critiques + Recommandations
 """
 
-from .data_models import FormData
+import streamlit as st
+from .theme import MODULE_COLORS, MODULE_ICONS, MODULE_LABELS, traffic_light, score_color, COLORS
+from .charts import gauge_chart, radar_chart, module_bar_chart, indices_bar_chart, benchmark_chart
 
 
-def _score_organisation_maintenance(data: FormData) -> int:
-    maint = data.maintenance.organisation
-    s = 0
-    if maint.gmao_utilisee == "oui": s += 15
-    if maint.existence_kpi == "oui": s += 8
-
-    pred_map = {"Prédictive": 30, "Préventive": 18, "Corrective": 0}
-    s += pred_map.get(maint.type_maintenance, 0)
-
-    return min(53, s)
+def render_gauge(score: int):
+    """Jauge score final."""
+    from .charts import gauge_chart
+    fig = gauge_chart(score)
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
-def _score_kpi_maintenance(data: FormData) -> int:
-    ind = data.maintenance.indicateurs
-    s = 0
+def render_three_indices(maturite: int, resilience: int, vulnerabilite: int):
+    """Affiche les 3 indices en cartes côte à côte."""
+    c1, c2, c3 = st.columns(3)
 
-    # MTBF global
-    mtbf = ind.mtbf_global or 0
-    if mtbf >= 3000: s += 15
-    elif mtbf >= 2000: s += 10
-    elif mtbf >= 1000: s += 5
+    def _card(col, score, icon, label, sublabel, color):
+        with col:
+            st.markdown(f"""
+            <div style="
+                background:{color}12; border:1px solid {color}30;
+                border-radius:10px; padding:12px; text-align:center;
+            ">
+                <div style="font-size:20px;">{icon}</div>
+                <div style="font-size:24px; font-weight:800; color:{color};
+                    font-family:'Sora',sans-serif; line-height:1;">{score}</div>
+                <div style="font-size:9px; color:#64748b; font-weight:600;
+                    font-family:'Sora',sans-serif; margin-top:3px; line-height:1.3;">{label}</div>
+                <div style="font-size:8px; color:{color}; font-weight:700;
+                    font-family:'Sora',sans-serif; margin-top:2px;">{sublabel}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-    # MTTR global
-    mttr = ind.mttr_global or 99
-    if mttr < 2: s += 12
-    elif mttr < 4: s += 8
-    elif mttr < 8: s += 4
-
-    # Taux planifié
-    taux = ind.taux_maint_planifie_pct or 0
-    if taux > 80: s += 10
-    elif taux > 60: s += 6
-
-    # Taux respect planning
-    respect = ind.taux_respect_planning_pct or 0
-    if respect > 90: s += 8
-    elif respect > 70: s += 4
-
-    return min(45, s)
+    _card(c1, maturite,     "⚙️",  "Maturité\nMécatronique",      "Auto + CPS + Capteurs",    COLORS["blue_light"])
+    _card(c2, resilience,   "🛡️",  "Résilience\nOpérationnelle",  "Maint + Stock + Interv.",  COLORS["green"])
+    _card(c3, 100-vulnerabilite, "🔎", "Robustesse\nSystémique",   "↑ = Moins vulnérable",     COLORS["amber"])
 
 
-def _score_maturite_maintenance(data: FormData) -> int:
-    mat = data.maintenance.maturite
-    s = 0
+def render_module_traffic_lights(module_scores: dict):
+    """Feux tricolores par module."""
+    st.markdown("""
+    <div style="font-size:12px; font-weight:700; color:#0f2244;
+        font-family:'Sora',sans-serif; margin: 12px 0 8px 0;">
+        Feu Tricolore — 8 Modules
+    </div>
+    """, unsafe_allow_html=True)
 
-    nd = int(mat.niveau_digitalisation or 0)
-    s += nd * 4  # 0-20
+    for key, score in module_scores.items():
+        tl = traffic_light(score)
+        icon  = MODULE_ICONS.get(key, "🔹")
+        label = MODULE_LABELS.get(key, key)
+        color = MODULE_COLORS.get(key, "#3b82f6")
 
-    if mat.ia_predictive == "oui": s += 20
-    if mat.maint_conditionnelle == "oui": s += 15
-
-    return min(55, s)
-
-
-def _score_stockage_resilience(data: FormData) -> int:
-    st = data.stockage
-    s = 10  # base
-
-    if st.assurantiel.pieces_crit_redond == "oui": s += 22
-    if st.assurantiel.fournisseurs_multiples == "oui": s += 18
-    if st.assurantiel.contrat_appro_prio == "oui": s += 10
-    if st.assurantiel.simulation_penurie == "oui": s += 8
-    if st.gestion_numerique.stock_minimum_defini == "oui": s += 10
-
-    rupture_map = {"0%": 18, "< 5%": 10, "5-15%": 0, "> 15%": -15}
-    s += rupture_map.get(st.gestion_numerique.taux_rupture_stock, 0)
-
-    pct = st.performance.pct_pieces_crit_stock or 0
-    if pct > 90: s += 10
-    elif pct > 70: s += 5
-
-    return min(100, max(0, s))
-
-
-def _score_intervention_resilience(data: FormData) -> int:
-    org = data.intervention.organisation
-    ind = data.intervention.indicateurs
-    dig = data.intervention.digitalisation
-    s = 0
-
-    if org.astreinte_247 == "oui": s += 18
-    if org.equipe_interne == "oui": s += 15
-    if org.techniciens_certif == "oui": s += 12
-
-    sla = org.sla_interne_h or 99
-    if sla <= 1: s += 10
-    elif sla <= 2: s += 7
-    elif sla <= 4: s += 3
-
-    pct4h = ind.pct_interv_4h or 0
-    if pct4h > 80: s += 12
-    elif pct4h > 60: s += 7
-
-    res_pp = ind.taux_resolution_pp or 0
-    if res_pp > 85: s += 8
-    elif res_pp > 70: s += 4
-
-    arret24 = ind.historique_arret_24h or 0
-    if arret24 == 0: s += 8
-    elif arret24 <= 2: s += 4
-    else: s -= 8
-
-    if dig.gmao_mobile == "oui": s += 8
-    if dig.tracabilite_rt == "oui": s += 7
-    if dig.dashboard_kpi == "oui": s += 7
-    if dig.historique_pannes_analyse == "oui": s += 5
-
-    return min(100, max(0, s))
+        st.markdown(f"""
+        <div style="
+            display:flex; align-items:center; justify-content:space-between;
+            padding: 6px 10px; background:#f8fafc; border-radius:7px;
+            margin-bottom:5px; border-left: 3px solid {color};
+        ">
+            <span style="font-size:11px; color:#1e293b;
+                font-family:'Sora',sans-serif; font-weight:500;">
+                {icon} {label}
+            </span>
+            <div style="display:flex; align-items:center; gap:5px;">
+                <span style="font-size:11px; font-weight:800;
+                    color:{tl['color']}; font-family:'Sora',sans-serif;">{score}</span>
+                <span style="font-size:9px; color:{tl['color']}; font-weight:700;
+                    background:{tl['color']}20; border-radius:4px;
+                    padding:1px 6px;">{tl['label']}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
-def _score_redondance_systemes(data: FormData) -> int:
-    s = 0
+def render_synthese(synthese: dict, score_global: int):
+    """Synthèse souscripteur."""
+    st.markdown("""
+    <div style="
+        background:#eff6ff; border-radius:10px; padding:14px;
+        border:1px solid #bfdbfe; margin-top:12px;
+    ">
+        <div style="font-size:10px; font-weight:800; color:#1d4ed8;
+            text-transform:uppercase; letter-spacing:1px;
+            margin-bottom:8px; font-family:'Sora',sans-serif;">
+            Synthèse Souscripteur
+        </div>
+    """, unsafe_allow_html=True)
 
-    redond_map = {"Élevé": 25, "Moyen": 12, "Faible": 0}
-    s += redond_map.get(data.robots.scoring.niveau_redondance, 0)
+    grid_items = [
+        ("Profil industriel",      synthese.get("profil_industriel", "—")),
+        ("Intégration digitale",   synthese.get("integration_digitale", "—")),
+        ("Résilience maintenance", synthese.get("resilience_maintenance", "—")),
+        ("Vulnérabilité IT/Cyber", synthese.get("vulnerabilite_it", "—")),
+    ]
 
-    if data.cps.infrastructure_it.redondance_serveurs == "oui": s += 25
-    if data.cps.assurantiel.plan_continuite == "oui": s += 25
-    if data.cps.assurantiel.simulation_crise == "oui": s += 15
-    if data.manutention.scoring.redond_equip_crit == "oui": s += 10
+    cols = st.columns(2)
+    for i, (label, val) in enumerate(grid_items):
+        with cols[i % 2]:
+            st.markdown(f"""
+            <div style="background:white; border-radius:6px; padding:7px 10px;
+                border:1px solid #dbeafe; margin-bottom:5px;">
+                <div style="font-size:9px; color:#64748b; font-weight:600;
+                    font-family:'Sora',sans-serif;">{label}</div>
+                <div style="font-size:12px; color:#1d4ed8; font-weight:700;
+                    font-family:'Sora',sans-serif;">{val}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-    return min(100, max(0, s))
+    if synthese.get("narrative"):
+        st.markdown(f"""
+        <div style="font-size:11px; color:#374151; line-height:1.6;
+            margin-top:8px; font-family:'Sora',sans-serif;">
+            {synthese['narrative']}
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-def compute_score_resilience(data: FormData) -> int:
-    """
-    Score de Résilience Opérationnelle global (0–100).
-    """
-    scores = {
-        "organisation":   _score_organisation_maintenance(data),
-        "kpi_maintenance": _score_kpi_maintenance(data),
-        "maturite":       _score_maturite_maintenance(data),
-        "stockage":       _score_stockage_resilience(data),
-        "intervention":   _score_intervention_resilience(data),
-        "redondance":     _score_redondance_systemes(data),
+def render_zones_critiques(zones: list):
+    """Carte des points sensibles."""
+    if not zones:
+        return
+
+    st.markdown("""
+    <div style="font-size:12px; font-weight:700; color:#dc2626;
+        font-family:'Sora',sans-serif; margin: 12px 0 8px 0;">
+        🗺️ Carte des Points Sensibles
+    </div>
+    """, unsafe_allow_html=True)
+
+    for i, zone in enumerate(zones[:6], 1):
+        is_crit = zone.niveau == "critique"
+        border_c = "#ef4444" if is_crit else "#f59e0b"
+        bg_c     = "#fef2f2" if is_crit else "#fffbeb"
+        lvl_lbl  = "CRITIQUE" if is_crit else "MAJEURE"
+
+        st.markdown(f"""
+        <div style="
+            border-left:3px solid {border_c}; background:{bg_c};
+            border-radius:5px; padding:8px 12px; margin-bottom:6px;
+        ">
+            <div style="font-size:10px; font-weight:800; color:{border_c};
+                font-family:'Sora',sans-serif;">
+                Zone {i} — {lvl_lbl} ({zone.module})
+            </div>
+            <div style="font-size:10px; color:#374151; margin-top:2px;
+                font-family:'Sora',sans-serif; line-height:1.4;">{zone.description}</div>
+            {f'<div style="font-size:9px; color:#64748b; margin-top:2px; font-style:italic;">→ {zone.impact}</div>' if zone.impact else ''}
+        </div>
+        """, unsafe_allow_html=True)
+
+
+def render_recommandations(recommandations: list):
+    """Recommandations priorisées."""
+    if not recommandations:
+        return
+
+    st.markdown("""
+    <div style="font-size:12px; font-weight:700; color:#0f2244;
+        font-family:'Sora',sans-serif; margin: 12px 0 8px 0;">
+        Recommandations
+    </div>
+    """, unsafe_allow_html=True)
+
+    colors_map = {
+        "Urgente":     ("#ef4444", "#fef2f2"),
+        "Prioritaire": ("#f59e0b", "#fffbeb"),
+        "Recommandée": ("#10b981", "#f0fdf4"),
     }
 
-    poids = {
-        "organisation":    0.20,
-        "kpi_maintenance": 0.18,
-        "maturite":        0.17,
-        "stockage":        0.20,
-        "intervention":    0.15,
-        "redondance":      0.10,
-    }
+    for rec in recommandations:
+        c, bg = colors_map.get(rec.priorite, ("#3b82f6", "#eff6ff"))
+        st.markdown(f"""
+        <div style="border-left:3px solid {c}; background:{bg};
+            border-radius:5px; padding:8px 12px; margin-bottom:6px;
+            display:flex; gap:8px; align-items:flex-start;">
+            <span style="font-size:8px; font-weight:800; padding:2px 6px;
+                border-radius:4px; background:{c}25; color:{c};
+                white-space:nowrap; margin-top:1px;
+                font-family:'Sora',sans-serif;">{rec.priorite}</span>
+            <span style="font-size:10px; color:#374151; line-height:1.5;
+                font-family:'Sora',sans-serif;">{rec.action}</span>
+        </div>
+        """, unsafe_allow_html=True)
 
-    total = sum(scores[k] * poids[k] for k in scores)
-    return min(100, max(0, round(total)))
+
+def render_placeholder():
+    """Placeholder quand aucun calcul n'a été fait."""
+    st.markdown("""
+    <div style="
+        padding:30px 20px; background:#f8fafc; border-radius:10px;
+        text-align:center; margin-top:20px;
+    ">
+        <div style="font-size:40px; margin-bottom:10px;">📊</div>
+        <div style="font-size:12px; color:#64748b; line-height:1.6;
+            font-family:'Sora',sans-serif;">
+            Remplissez les 5 étapes du formulaire<br>
+            puis cliquez sur <strong style="color:#1d4ed8;">Valider et Calculer</strong><br>
+            pour générer l'analyse complète.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)

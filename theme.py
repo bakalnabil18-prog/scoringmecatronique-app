@@ -1,452 +1,267 @@
 """
-fair_model.py
-═══════════════════════════════════════════════════════════════════
-Adaptation du modèle FAIR (Factor Analysis of Information Risk)
-au contexte industriel OT — PFE Nabil EL BAKAL, ENSA Kénitra 2025
-
-FAIR original :   Risque = LEF × LM
-Notre adaptation : Risque Industriel 4.0 = f(Indice C) × f(100 − Indice B)
-
-Correspondance :
-  TCF  (Threat Contact Frequency)  →  Indice C : exposition cyber OT
-  Vulnerability                    →  Fragilité IT + absence segmentation
-  LEF  (Loss Event Frequency)      →  f(Indice C)
-  PLEF (Primary Loss)              →  Coût dommage matériel (tableau 2.7.9)
-  SLEF (Secondary Loss)            →  PE numérique allongée
-  LM   (Loss Magnitude)            →  f(100 − Indice B)
-  Risk                             →  Score Global inversé
+dashboard_innovant.py
+══════════════════════════════════════════════════════════════════
+Panneau de résultats pour les 20 indicateurs innovants.
+Affiche dans le dashboard : impact sur les 3 indices,
+tableau des 20 indicateurs avec feux tricolores, top risques.
+══════════════════════════════════════════════════════════════════
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, Tuple
-from .data_models import FormData, ScoreResult
+import streamlit as st
+from ..engine.scoring_innovant import InnovatifScores, get_innovant_summary, get_top_innovant_risks
 
 
-# ══════════════════════════════════════════════════════
-#  DATACLASSES FAIR
-# ══════════════════════════════════════════════════════
-
-@dataclass
-class FAIRComponentes:
-    """Composantes FAIR calculées à partir des indices du prototype."""
-
-    # ── Fréquence ────────────────────────────────────────────────
-    tcf_score: float = 0.0          # Threat Contact Frequency (0-100)
-    tcf_label: str = ""             # Basse / Modérée / Élevée / Très élevée
-    vulnerability_score: float = 0.0
-    vulnerability_label: str = ""
-
-    lef_annuelle_min: float = 0.0   # Sinistres/an — borne basse
-    lef_annuelle_max: float = 0.0   # Sinistres/an — borne haute
-    lef_label: str = ""
-
-    # ── Magnitude ────────────────────────────────────────────────
-    primary_loss_min: float = 0.0   # MAD — dommage direct min
-    primary_loss_max: float = 0.0   # MAD — dommage direct max
-    secondary_loss_min: float = 0.0 # MAD — PE numérique + indirect min
-    secondary_loss_max: float = 0.0 # MAD — PE numérique + indirect max
-    total_lm_min: float = 0.0       # MAD — perte totale min
-    total_lm_max: float = 0.0       # MAD — perte totale max
-    lm_label: str = ""
-
-    # ── Risque agrégé ─────────────────────────────────────────────
-    risk_annuel_min: float = 0.0    # MAD/an — perte annuelle attendue min
-    risk_annuel_max: float = 0.0    # MAD/an — perte annuelle attendue max
-    risk_label: str = ""
-    risk_color: str = "#ef4444"
-
-    # ── Multiplicateur PE numérique ───────────────────────────────
-    pe_multiplier: float = 1.0      # Facteur d'allongement PE vs industrie 3.0
-    pe_weeks_min: int = 0
-    pe_weeks_max: int = 0
-    pe_label: str = ""
-
-    # ── Correspondance FAIR → Indices ────────────────────────────
-    mapping: Dict[str, str] = field(default_factory=dict)
-
-
-@dataclass
-class FAIRResult:
-    """Résultat complet de l'analyse FAIR."""
-    composantes: FAIRComponentes = field(default_factory=FAIRComponentes)
-    score_indice_a: int = 0
-    score_indice_b: int = 0
-    score_indice_c: int = 0
-    score_global: int = 0
-    narrative: str = ""
-    limites: list = field(default_factory=list)
-
-
-# ══════════════════════════════════════════════════════
-#  CALCUL TCF — Threat Contact Frequency
-# ══════════════════════════════════════════════════════
-
-def _compute_tcf(data: FormData, score_c: int) -> Tuple[float, str]:
-    """
-    TCF = fréquence à laquelle une menace entre en contact avec les actifs OT.
-    Proxy : Indice C (exposition) pondéré par des facteurs contextuels.
-    """
-    # Base : Indice C normalise la probabilité d'exposition
-    tcf = score_c * 0.7  # L'indice C capte 70% du TCF
-
-    # Bonus d'exposition si accès distants non contrôlés
-    if data.cps.infrastructure_it.audit_cyber != "oui":
-        tcf += 8
-    if data.cps.architecture.segmentation_reseau == "Faible":
-        tcf += 12
-    elif data.cps.architecture.segmentation_reseau == "Moyenne":
-        tcf += 5
-
-    # Incidents IT historiques = preuve de contact passé
-    inc_map = {"3+/an": 15, "1-2/an": 8, "Aucun": 0}
-    tcf += inc_map.get(getattr(data.cps.assurantiel, "historique_incid_it", "Aucun"), 0)
-
-    tcf = min(100, max(0, round(tcf)))
-
-    if tcf >= 70:   label = "Très élevée"
-    elif tcf >= 45: label = "Élevée"
-    elif tcf >= 25: label = "Modérée"
-    else:           label = "Basse"
-
-    return tcf, label
-
-
-# ══════════════════════════════════════════════════════
-#  CALCUL VULNERABILITY
-# ══════════════════════════════════════════════════════
-
-def _compute_vulnerability(data: FormData, score_c: int) -> Tuple[float, str]:
-    """
-    Vulnerability = probabilité que la menace réussisse à exploiter l'actif.
-    Proxy : Fragilité IT + absence de défenses actives.
-    """
-    v = 0.0
-
-    # Absence de défenses actives
-    if data.cps.infrastructure_it.parefeu_industriel != "oui":  v += 20
-    if data.cps.infrastructure_it.backup_quotidien != "oui":    v += 15
-    if data.cps.infrastructure_it.redondance_serveurs != "oui": v += 12
-    if data.robots.scoring.maj_firmware != "oui":               v += 10
-    if data.cps.assurantiel.simulation_crise != "oui":          v += 8
-
-    # Normaliser sur 100
-    v = min(100, max(0, round(v)))
-
-    if v >= 65:   label = "Critique"
-    elif v >= 40: label = "Élevée"
-    elif v >= 20: label = "Modérée"
-    else:         label = "Faible"
-
-    return v, label
-
-
-# ══════════════════════════════════════════════════════
-#  CALCUL LEF — Loss Event Frequency
-# ══════════════════════════════════════════════════════
-
-def _compute_lef(tcf: float, vulnerability: float, score_c: int) -> Tuple[float, float, str]:
-    """
-    LEF = TCF × Vulnerability → fréquence annuelle sinistres.
-    Traduit en nombre de sinistres/an attendus.
-    """
-    # Formule FAIR simplifiée : LEF ∝ TCF × Vulnerability / 10000
-    lef_raw = (tcf * vulnerability) / 10000.0
-
-    # Calibration sur données sectorielles (fourchettes)
-    if score_c >= 70:
-        lef_min, lef_max = 2.0, 5.0
-        label = "Très fréquents (2–5 sinistres/an)"
-    elif score_c >= 45:
-        lef_min, lef_max = 1.0, 2.5
-        label = "Fréquents (1–2.5 sinistres/an)"
-    elif score_c >= 25:
-        lef_min, lef_max = 0.5, 1.2
-        label = "Modérés (0.5–1.2 sinistres/an)"
-    else:
-        lef_min, lef_max = 0.2, 0.8
-        label = "Faibles (0.2–0.8 sinistres/an)"
-
-    return lef_min, lef_max, label
-
-
-# ══════════════════════════════════════════════════════
-#  CALCUL LOSS MAGNITUDE
-# ══════════════════════════════════════════════════════
-
-def _compute_loss_magnitude(
-    data: FormData,
-    score_b: int,
-    score_c: int
-) -> Tuple[float, float, float, float, float, float, float, int, int, str]:
-    """
-    LM = Primary Loss + Secondary Loss.
-    Primary  = dommage matériel direct (bris machine)
-    Secondary = PE numérique allongée + pénalités + forensique
-    """
-
-    # ── Estimation dommage primaire ────────────────────────────────
-    # Basé sur le profil d'équipements et valeurs déclarées
-    robots_val = getattr(data.robots.quantitatif, "valeur_totale_parc_mad", None) or 0
-    cnc_val    = (getattr(data.cnc.technique, "nombre_cnc", None) or 0) * \
-                 (getattr(data.cnc.technique, "valeur_unitaire_mad", None) or 200_000)
-
-    # Estimation basique si pas de données
-    base_primary = max(robots_val * 0.15, cnc_val * 0.20, 150_000)
-    primary_min = round(base_primary * 0.6, -3)
-    primary_max = round(base_primary * 2.5, -3)
-
-    # ── Multiplicateur PE numérique ────────────────────────────────
-    # Basé sur Indice B (résilience) et ISP (backup PLC)
-    backup_ok   = data.cps.infrastructure_it.backup_quotidien == "oui"
-    pca_ok      = data.cps.assurantiel.plan_continuite == "oui"
-    mttr        = data.maintenance.indicateurs.mttr_global or 12
-
-    if score_b >= 75 and backup_ok and pca_ok:
-        pe_mult = 1.2
-        weeks_min, weeks_max = 1, 2
-        pe_label = "PE courte — résilience élevée (+20% vs physique)"
-    elif score_b >= 55:
-        pe_mult = 2.0
-        weeks_min, weeks_max = 2, 6
-        pe_label = "PE modérée — allongement numérique ×2"
-    elif score_b >= 35:
-        pe_mult = 4.0
-        weeks_min, weeks_max = 4, 16
-        pe_label = "PE longue — allongement numérique ×4"
-    else:
-        pe_mult = 8.0
-        weeks_min, weeks_max = 8, 26
-        pe_label = "PE critique — reconstruction logicielle / forensique"
-
-    # Marge brute journalière estimée
-    ca = data.identification.ca_annuel_mad or 30_000_000
-    marge_journaliere = ca * 0.30 / 365
-
-    secondary_min = round(marge_journaliere * weeks_min * 7 * 0.6, -3)
-    secondary_max = round(marge_journaliere * weeks_max * 7, -3)
-
-    total_min = primary_min + secondary_min
-    total_max = primary_max + secondary_max
-
-    if total_max >= 10_000_000: lm_label = "Catastrophique (>10M MAD)"
-    elif total_max >= 3_000_000: lm_label = "Grave (3–10M MAD)"
-    elif total_max >= 500_000:  lm_label = "Modérée (500K–3M MAD)"
-    else:                       lm_label = "Limitée (<500K MAD)"
-
+def _badge(text, color, bg):
     return (
-        primary_min, primary_max,
-        secondary_min, secondary_max,
-        total_min, total_max,
-        pe_mult, weeks_min, weeks_max,
-        lm_label, pe_label
+        f'<span style="background:{bg}; color:{color}; padding:3px 10px; '
+        f'border-radius:12px; font-size:12px; font-weight:600">{text}</span>'
     )
 
 
-# ══════════════════════════════════════════════════════
-#  CALCUL RISQUE ANNUEL
-# ══════════════════════════════════════════════════════
-
-def _compute_annual_risk(
-    lef_min: float, lef_max: float,
-    total_lm_min: float, total_lm_max: float,
-    score_global: int
-) -> Tuple[float, float, str, str]:
+def render_innovant_impact(innovant: InnovatifScores):
     """
-    Risque annuel = LEF × LM.
-    Représente la perte financière annuelle attendue (ALE — Annual Loss Expectancy).
+    Carte synthèse : impact des 20 indicateurs sur les 3 indices.
     """
-    risk_min = round(lef_min * total_lm_min, -3)
-    risk_max = round(lef_max * total_lm_max, -3)
+    st.markdown("### 🔬 Impact des Indicateurs Innovants")
 
-    if score_global >= 80:
-        label = "Risque maîtrisé — prime standard"
-        color = "#10b981"
-    elif score_global >= 65:
-        label = "Risque modéré — prime légèrement majorée"
-        color = "#3b82f6"
-    elif score_global >= 45:
-        label = "Risque significatif — prime majorée +15 à 35%"
-        color = "#f59e0b"
-    elif score_global >= 25:
-        label = "Risque élevé — surprime + conditions particulières"
-        color = "#ef4444"
-    else:
-        label = "Risque critique — tarification individuelle / refus"
-        color = "#7f1d1d"
+    col1, col2, col3 = st.columns(3)
 
-    return risk_min, risk_max, label, color
+    with col1:
+        bonus_a = innovant.score_maturite_bonus
+        color = "#10b981" if bonus_a > 0 else ("#ef4444" if bonus_a < 0 else "#6b7280")
+        sign = "+" if bonus_a >= 0 else ""
+        st.markdown(f"""
+        <div style="background:#eff6ff; border-radius:10px; padding:14px; text-align:center; border:1px solid #bfdbfe">
+            <div style="font-size:11px; color:#3b82f6; font-weight:700; text-transform:uppercase; letter-spacing:1px">
+                Indice A — Maturité
+            </div>
+            <div style="font-size:28px; font-weight:800; color:{color}; margin:6px 0">
+                {sign}{bonus_a} pts
+            </div>
+            <div style="font-size:11px; color:#555">
+                Bonus/malus sur l'Indice A de base
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
+    with col2:
+        bonus_b = innovant.score_resilience_bonus
+        color = "#10b981" if bonus_b > 0 else ("#ef4444" if bonus_b < 0 else "#6b7280")
+        sign = "+" if bonus_b >= 0 else ""
+        st.markdown(f"""
+        <div style="background:#ecfdf5; border-radius:10px; padding:14px; text-align:center; border:1px solid #a7f3d0">
+            <div style="font-size:11px; color:#059669; font-weight:700; text-transform:uppercase; letter-spacing:1px">
+                Indice B — Résilience
+            </div>
+            <div style="font-size:28px; font-weight:800; color:{color}; margin:6px 0">
+                {sign}{bonus_b} pts
+            </div>
+            <div style="font-size:11px; color:#555">
+                Bonus/malus sur l'Indice B de base
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════
-#  CORRESPONDANCE FAIR ↔ INDICES
-# ══════════════════════════════════════════════════════
-
-def _build_mapping(score_a: int, score_b: int, score_c: int) -> Dict[str, str]:
-    """Tableau de correspondance FAIR ↔ Indices du prototype."""
-    return {
-        "TCF (Threat Contact Frequency)":
-            f"Indice C = {score_c} → Exposition cyber OT "
-            f"({'élevée' if score_c > 50 else 'maîtrisée'})",
-        "Vulnerability":
-            f"Fragilité IT + Absence segmentation "
-            f"(composantes Indice C)",
-        "LEF (Loss Event Frequency)":
-            f"f(Indice C = {score_c}) → fréquence sinistres industriels",
-        "Primary Loss (PLEF)":
-            f"Dommages matériels directs — robots, CNC, SCADA "
-            f"(tableau équipements ch.2)",
-        "Secondary Loss (SLEF)":
-            f"PE numérique × multiplicateur f(Indice B = {score_b}) "
-            f"+ pénalités contractuelles",
-        "Loss Magnitude (LM)":
-            f"f(100 − Indice B = {100 - score_b}) → "
-            f"capacité absorption inversée",
-        "Risk (LEF × LM)":
-            f"Score Global inversé = {100 - score_b * 0.45:.0f} "
-            f"→ perte annuelle attendue (ALE)",
-    }
-
-
-# ══════════════════════════════════════════════════════
-#  NARRATIVE FAIR
-# ══════════════════════════════════════════════════════
-
-def _build_narrative(composantes: FAIRComponentes, score_global: int, nom: str) -> str:
-    """Génère la narrative FAIR en langage souscripteur."""
-    nom = nom or "Ce site industriel"
-
-    if score_global >= 80:
-        return (
-            f"{nom} présente un profil FAIR favorable. La fréquence d'exposition aux menaces "
-            f"est maîtrisée (TCF : {composantes.tcf_label}) et la capacité d'absorption "
-            f"des pertes est élevée. La perte annuelle attendue est bornée et prévisible."
-        )
-    elif score_global >= 65:
-        return (
-            f"{nom} présente un profil FAIR intermédiaire. Quelques vulnérabilités résiduelles "
-            f"(TCF : {composantes.tcf_label}) sont compensées par une résilience opérationnelle "
-            f"correcte. Des mesures de prévention ciblées permettraient de réduire "
-            f"significativement la magnitude des pertes secondaires."
-        )
-    elif score_global >= 45:
-        return (
-            f"{nom} présente un profil FAIR préoccupant. La fréquence d'exposition "
-            f"({composantes.tcf_label}) combinée à une résilience insuffisante génère "
-            f"un risque d'allongement PE numérique estimé à ×{composantes.pe_multiplier:.0f} "
-            f"par rapport à l'industrie 3.0. Conditions de souscription renforcées recommandées."
-        )
-    else:
-        return (
-            f"{nom} présente un profil FAIR critique. L'exposition élevée aux menaces "
-            f"({composantes.tcf_label}), combinée à des vulnérabilités structurelles multiples "
-            f"et une résilience insuffisante, génère une perte annuelle attendue "
-            f"potentiellement catastrophique. Visite terrain et audit OT préalables requis."
-        )
+    with col3:
+        bonus_c = innovant.score_vulnerabilite_bonus
+        color = "#ef4444" if bonus_c > 5 else ("#f59e0b" if bonus_c > 0 else "#10b981")
+        sign = "+" if bonus_c > 0 else ""
+        st.markdown(f"""
+        <div style="background:#fef2f2; border-radius:10px; padding:14px; text-align:center; border:1px solid #fecaca">
+            <div style="font-size:11px; color:#dc2626; font-weight:700; text-transform:uppercase; letter-spacing:1px">
+                Indice C — Vulnérabilité
+            </div>
+            <div style="font-size:28px; font-weight:800; color:{color}; margin:6px 0">
+                {sign}{bonus_c} pts
+            </div>
+            <div style="font-size:11px; color:#555">
+                Malus additionnel sur l'Indice C
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════
-#  FONCTION PRINCIPALE
-# ══════════════════════════════════════════════════════
-
-def compute_fair_analysis(data: FormData, result: ScoreResult) -> FAIRResult:
+def render_innovant_table(innovant: InnovatifScores):
     """
-    Calcule l'analyse FAIR complète à partir des scores du prototype.
-
-    Args:
-        data   : FormData — données saisies par l'utilisateur
-        result : ScoreResult — résultats déjà calculés par le pipeline
-
-    Returns:
-        FAIRResult — analyse FAIR complète
+    Tableau des 20 indicateurs avec score, indice et label.
     """
-    sa = result.score_maturite
-    sb = result.score_resilience
-    sc = result.score_vulnerabilite
-    sg = result.score_global
-    nom = data.identification.entreprise or "Ce site"
+    st.markdown("### 📋 Détail des 20 Indicateurs Innovants")
 
-    # ── 1. TCF ────────────────────────────────────────────────────
-    tcf, tcf_label = _compute_tcf(data, sc)
+    items = get_innovant_summary(innovant)
 
-    # ── 2. Vulnerability ─────────────────────────────────────────
-    vuln, vuln_label = _compute_vulnerability(data, sc)
+    if not items:
+        st.info("Aucun indicateur innovant renseigné.")
+        return
 
-    # ── 3. LEF ────────────────────────────────────────────────────
-    lef_min, lef_max, lef_label = _compute_lef(tcf, vuln, sc)
+    # Grouper par indice
+    for indice_label, indice_key, bg in [
+        ("⚙️ Indice A — Maturité Mécatronique", "A", "#eff6ff"),
+        ("🛡️ Indice B — Résilience Opérationnelle", "B", "#ecfdf5"),
+        ("🔎 Indice C — Vulnérabilité Systémique", "C", "#fef2f2"),
+    ]:
+        group = [i for i in items if i["indice"] == indice_key
+                 or (i["indice"] == "A+C" and indice_key == "A")]
+        if not group:
+            continue
 
-    # ── 4. Loss Magnitude ─────────────────────────────────────────
-    (
-        primary_min, primary_max,
-        secondary_min, secondary_max,
-        total_min, total_max,
-        pe_mult, weeks_min, weeks_max,
-        lm_label, pe_label
-    ) = _compute_loss_magnitude(data, sb, sc)
+        st.markdown(f"""
+        <div style="background:{bg}; border-radius:8px; padding:8px 14px;
+             margin:14px 0 6px 0; font-weight:700; font-size:14px">
+            {indice_label}
+        </div>
+        """, unsafe_allow_html=True)
 
-    # ── 5. Risque Annuel ─────────────────────────────────────────
-    risk_min, risk_max, risk_label, risk_color = _compute_annual_risk(
-        lef_min, lef_max, total_min, total_max, sg
+        for item in group:
+            score = item["score"]
+            max_s = item["max"]
+            pct = int(score / max_s * 100) if max_s > 0 else 0
+            impact = item["impact"]
+            nom = item["indicateur"]
+            label = item["label"]
+
+            # Couleur barre de progression
+            if indice_key == "C":
+                bar_color = "#ef4444" if pct > 60 else ("#f59e0b" if pct > 30 else "#10b981")
+            else:
+                bar_color = "#10b981" if pct > 60 else ("#f59e0b" if pct > 30 else "#ef4444")
+
+            st.markdown(f"""
+            <div style="background:white; border-radius:6px; padding:10px 14px;
+                 margin-bottom:6px; border:1px solid #e2e8f0">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+                    <span style="font-size:13px; font-weight:600; color:#1e293b">
+                        {nom.split(" — ")[0]}
+                        <span style="font-weight:400; color:#64748b"> — {nom.split(" — ", 1)[-1]}</span>
+                    </span>
+                    <span style="font-size:12px; margin-left:12px; white-space:nowrap">
+                        {impact}
+                        <span style="color:#475569; margin-left:8px">
+                            {score}/{max_s}
+                        </span>
+                    </span>
+                </div>
+                <div style="background:#f1f5f9; border-radius:3px; height:5px; overflow:hidden">
+                    <div style="background:{bar_color}; width:{pct}%; height:100%; border-radius:3px"></div>
+                </div>
+                <div style="font-size:11px; color:#64748b; margin-top:4px">{label}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+
+def render_innovant_top_risks(innovant: InnovatifScores):
+    """
+    Top 5 signaux d'alerte issus des indicateurs innovants.
+    Pour la fiche souscripteur.
+    """
+    risks = get_top_innovant_risks(innovant, n=5)
+    if not risks:
+        st.success("✅ Aucun signal d'alerte majeur détecté sur les indicateurs innovants.")
+        return
+
+    st.markdown("### ⚠️ Signaux d'Alerte — Indicateurs Innovants")
+    st.markdown(
+        '<p style="font-size:12px; color:#64748b; margin-top:-8px">'
+        'Points d\'attention spécifiques aux usines Industry 4.0 — '
+        'non couverts par les questionnaires classiques</p>',
+        unsafe_allow_html=True
     )
 
-    # ── 6. Correspondance ────────────────────────────────────────
-    mapping = _build_mapping(sa, sb, sc)
+    for r in risks:
+        nom = r["indicateur"]
+        label = r["label"]
+        indice = r["indice"]
+        score = r["score"]
+        max_s = r["max"]
 
-    # ── 7. Assembler composantes ─────────────────────────────────
-    composantes = FAIRComponentes(
-        tcf_score=tcf,
-        tcf_label=tcf_label,
-        vulnerability_score=vuln,
-        vulnerability_label=vuln_label,
-        lef_annuelle_min=lef_min,
-        lef_annuelle_max=lef_max,
-        lef_label=lef_label,
-        primary_loss_min=primary_min,
-        primary_loss_max=primary_max,
-        secondary_loss_min=secondary_min,
-        secondary_loss_max=secondary_max,
-        total_lm_min=total_min,
-        total_lm_max=total_max,
-        lm_label=lm_label,
-        risk_annuel_min=risk_min,
-        risk_annuel_max=risk_max,
-        risk_label=risk_label,
-        risk_color=risk_color,
-        pe_multiplier=pe_mult,
-        pe_weeks_min=weeks_min,
-        pe_weeks_max=weeks_max,
-        pe_label=pe_label,
-        mapping=mapping,
-    )
+        border = "#ef4444" if indice == "C" and score >= max_s * 0.6 else "#f59e0b"
+        icon = "🔴" if border == "#ef4444" else "🟡"
+        indice_badge_color = {
+            "A": "#3b82f6", "B": "#10b981", "C": "#ef4444", "A+C": "#8b5cf6"
+        }.get(indice, "#6b7280")
 
-    # ── 8. Limites du modèle ─────────────────────────────────────
-    limites = [
-        "Données de fréquence calibrées sur estimations expertes — "
-        "la calibration statistique (Phase 2) affiner ces fourchettes.",
-        "FAIR standard ne modélise pas la résilience opérationnelle — "
-        "l'Indice B comble cette lacune (absent du framework original).",
-        "Les pertes secondaires (forensique, pénalités contractuelles) "
-        "sont estimées par fourchettes — à affiner lors de la visite de risque.",
+        st.markdown(f"""
+        <div style="background:white; border-left:4px solid {border}; border-radius:6px;
+             padding:12px 16px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,.06)">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px">
+                <span style="font-size:14px">{icon}</span>
+                <span style="font-weight:700; font-size:13px; color:#1e293b">{nom}</span>
+                <span style="background:{indice_badge_color}; color:white; padding:1px 8px;
+                    border-radius:10px; font-size:11px; font-weight:600">
+                    Indice {indice}
+                </span>
+            </div>
+            <div style="font-size:12px; color:#475569">{label}</div>
+            <div style="font-size:11px; color:#94a3b8; margin-top:3px">
+                Score : {score}/{max_s}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+def render_innovant_score_comparison(
+    base_global: int,
+    final_global: int,
+    base_maturite: int,
+    final_maturite: int,
+    base_resilience: int,
+    final_resilience: int,
+    base_vulnerabilite: int,
+    final_vulnerabilite: int,
+):
+    """
+    Comparaison avant/après intégration des indicateurs innovants.
+    """
+    st.markdown("### 📊 Impact sur le Score Global")
+
+    delta = final_global - base_global
+    color = "#10b981" if delta > 0 else ("#ef4444" if delta < 0 else "#6b7280")
+    sign = "+" if delta >= 0 else ""
+
+    st.markdown(f"""
+    <div style="background:linear-gradient(135deg, #0f2244, #1d4ed8);
+         border-radius:12px; padding:20px; text-align:center; margin-bottom:14px">
+        <div style="color:#93c5fd; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:1px">
+            Score Global avec indicateurs innovants
+        </div>
+        <div style="display:flex; justify-content:center; align-items:center; gap:20px; margin-top:10px">
+            <div style="text-align:center">
+                <div style="color:#94a3b8; font-size:11px">Base</div>
+                <div style="color:white; font-size:32px; font-weight:800">{base_global}</div>
+            </div>
+            <div style="color:#60a5fa; font-size:24px">→</div>
+            <div style="text-align:center">
+                <div style="color:#93c5fd; font-size:11px">Final</div>
+                <div style="color:white; font-size:40px; font-weight:900">{final_global}</div>
+            </div>
+            <div style="text-align:center">
+                <div style="color:#94a3b8; font-size:11px">Variation</div>
+                <div style="color:{color}; font-size:28px; font-weight:800">{sign}{delta}</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Tableau comparatif par indice
+    rows = [
+        ("⚙️ Maturité (A)", base_maturite, final_maturite),
+        ("🛡️ Résilience (B)", base_resilience, final_resilience),
+        ("🔎 Vulnérabilité (C)", base_vulnerabilite, final_vulnerabilite),
     ]
 
-    # ── 9. Narrative ─────────────────────────────────────────────
-    narrative = _build_narrative(composantes, sg, nom)
-
-    return FAIRResult(
-        composantes=composantes,
-        score_indice_a=sa,
-        score_indice_b=sb,
-        score_indice_c=sc,
-        score_global=sg,
-        narrative=narrative,
-        limites=limites,
-    )
-
-
-def format_mad(valeur: float) -> str:
-    """Formate un montant en MAD de manière lisible."""
-    if valeur >= 1_000_000:
-        return f"{valeur/1_000_000:.1f}M MAD"
-    elif valeur >= 1_000:
-        return f"{valeur/1_000:.0f}K MAD"
-    else:
-        return f"{valeur:.0f} MAD"
+    cols = st.columns(3)
+    for idx, (label, base_val, final_val) in enumerate(rows):
+        d = final_val - base_val
+        dc = "#10b981" if (d > 0 and idx < 2) or (d < 0 and idx == 2) else (
+             "#ef4444" if d != 0 else "#6b7280")
+        ds = "+" if d >= 0 else ""
+        with cols[idx]:
+            st.markdown(f"""
+            <div style="background:#f8fafc; border-radius:8px; padding:12px; text-align:center;
+                 border:1px solid #e2e8f0">
+                <div style="font-size:12px; color:#64748b; font-weight:600">{label}</div>
+                <div style="font-size:11px; color:#94a3b8; margin:4px 0">
+                    {base_val} → <strong style="color:#1e293b">{final_val}</strong>
+                </div>
+                <div style="font-size:18px; font-weight:800; color:{dc}">{ds}{d}</div>
+            </div>
+            """, unsafe_allow_html=True)
